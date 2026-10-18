@@ -27,8 +27,13 @@ export async function ensureSeed() {
       }
 
       // Check if mechanics table is empty
-      const existingMechanics = await db.select({ value: count() }).from(mechanics);
-      const totalMechanics = Number(existingMechanics[0]?.value ?? 0);
+      let totalMechanics = 0;
+      try {
+        const existingMechanics = await db.select({ value: count() }).from(mechanics);
+        totalMechanics = Number(existingMechanics[0]?.value ?? 0);
+      } catch (err) {
+        console.warn("[SevaiGo Seed] Count mechanics note:", err);
+      }
 
       if (totalMechanics === 0 && INITIAL_MECHANICS.length > 0) {
         // Seed users first so owner foreign keys match

@@ -34,15 +34,20 @@ export function verifyPassword(password: string, stored: string) {
 }
 
 export async function getSessionUser(): Promise<PublicUser | null> {
-  const token = (await cookies()).get(COOKIE_NAME)?.value;
-  if (!token) return null;
-  const [result] = await db
-    .select({ id: users.id, name: users.name, email: users.email, phone: users.phone, role: users.role })
-    .from(sessions)
-    .innerJoin(users, eq(sessions.userId, users.id))
-    .where(and(eq(sessions.token, token), gt(sessions.expiresAt, new Date())))
-    .limit(1);
-  return result ?? null;
+  try {
+    const token = (await cookies()).get(COOKIE_NAME)?.value;
+    if (!token) return null;
+    const [result] = await db
+      .select({ id: users.id, name: users.name, email: users.email, phone: users.phone, role: users.role })
+      .from(sessions)
+      .innerJoin(users, eq(sessions.userId, users.id))
+      .where(and(eq(sessions.token, token), gt(sessions.expiresAt, new Date())))
+      .limit(1);
+    return result ?? null;
+  } catch (err) {
+    console.warn("[SevaiGo Auth] getSessionUser safe fallback:", err);
+    return null;
+  }
 }
 
 export async function createSession(userId: string) {
