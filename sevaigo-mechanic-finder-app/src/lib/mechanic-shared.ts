@@ -1,0 +1,35 @@
+export const DEMO_LOCATION = { latitude: 13.0597, longitude: 80.2514, label: "Nungambakkam, Chennai" };
+
+export type MechanicView = {
+  id: string;
+  slug: string;
+  shopName: string;
+  ownerName: string;
+  ownerPhoto: string;
+  phone: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  vehicleTypes: string[];
+  specializations: string[];
+  openTime: string;
+  closeTime: string;
+  rating: number;
+  reviewCount: number;
+  photos: string[];
+  isVerified: boolean;
+  availabilityStatus: string;
+  priceMin: number;
+  priceMax: number;
+  yearsExperience: number;
+  distanceKm: number;
+  etaMinutes: number;
+  isOpen: boolean;
+  city?: string | null;
+  pincode?: string | null;
+  shopPhone?: string | null;
+  workingDays?: string[] | null;
+  isRegisteredOwner?: boolean;
+  spareParts?: string[];
+  isOnline?: boolean;
+};
