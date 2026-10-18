@@ -1,4 +1,4 @@
-export const DEMO_LOCATION = { latitude: 13.0597, longitude: 80.2514, label: "Nungambakkam, Chennai" };
+export const DEMO_LOCATION = { latitude: 13.0597, longitude: 80.2514, label: "Detecting GPS Location..." };
 
 export type MechanicView = {
   id: string;

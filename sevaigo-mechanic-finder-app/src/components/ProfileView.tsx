@@ -35,9 +35,16 @@ export default function ProfileView({
   onOpenOffers,
   onOpenHelp,
 }: ProfileViewProps) {
-  const userName = user?.name || "Nivash K";
-  const userEmail = user?.email || "nivashk@gmail.com";
-  const userPhone = user?.phone || "+91 98765 43210";
+  const userName = user?.name || (user?.phone ? `Rider ${user.phone.slice(-4)}` : "SevaiGo Rider");
+  const userEmail = user?.email && !user.email.includes("@sevaigo.local") ? user.email : (user?.phone ? `+91 ${user.phone.replace(/\D/g, "")}` : "Verified Mobile Account");
+  const userPhone = user?.phone ? (user.phone.startsWith("+91") ? user.phone : `+91 ${user.phone.replace(/\D/g, "")}`) : "Signed in via OTP";
+
+  const initials = userName
+    .split(" ")
+    .filter(Boolean)
+    .map((p) => p[0]?.toUpperCase())
+    .slice(0, 2)
+    .join("") || "R";
 
   const menuItems = [
     {
@@ -45,14 +52,12 @@ export default function ProfileView({
       title: "My Bookings",
       icon: Calendar,
       action: () => onNavigate("activity"),
-      badge: "1 Active",
     },
     {
       id: "bikes",
       title: "My Bikes",
       icon: Bike,
       action: () => onNavigate("vehicles"),
-      badge: "Yamaha FZ",
     },
     {
       id: "payments",
@@ -89,15 +94,7 @@ export default function ProfileView({
           <div className="relative">
             <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#FF7900] via-[#FFB020] to-[#ea580c] p-0.5 shadow-lg">
               <div className="w-full h-full rounded-full bg-[#121820] flex items-center justify-center overflow-hidden">
-                <img
-                  src="/images/owner-1.jpg"
-                  alt={userName}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.target as any).style.display = "none";
-                  }}
-                />
-                <span className="text-xl font-bold text-white">NK</span>
+                <span className="text-xl font-black text-[#FF7900] tracking-wide font-['Manrope']">{initials}</span>
               </div>
             </div>
             <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#FF7900] text-white flex items-center justify-center text-[10px] shadow">

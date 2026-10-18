@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import Image from "next/image";
 import {
   ArrowLeft, ArrowRight, ArrowUpRight, Bell, Bike, Calendar, Camera, CarFront, Check, CheckCircle2, ChevronDown,
   ChevronRight, Clock3, Compass, Copy, Heart, HelpCircle, Layers, LifeBuoy, LocateFixed, LogOut, MapPin,
@@ -93,10 +94,10 @@ export default function SevaiGoApp({
   initialShops: MechanicView[];
   initialUser: PublicUser | null;
 }) {
-  const [view, setView] = useState<View>("home");
+  const [view, setView] = useState<View>("splash");
   const [user, setUser] = useState<PublicUser | null>(initialUser);
   const [shops, setShops] = useState<MechanicView[]>(initialShops);
-  const [location, setLocation] = useState<MapLocation>({ ...DEMO_LOCATION, source: "demo" });
+  const [location, setLocation] = useState<MapLocation>({ ...DEMO_LOCATION, label: "Detecting GPS...", source: "gps" });
   const [language, setLanguage] = useState<Language>("en");
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -109,11 +110,11 @@ export default function SevaiGoApp({
   const [loadingShops, setLoadingShops] = useState(false);
   const [toast, setToast] = useState("");
 
-  // Authentication State
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(true); // default true for immediate interactive access, with login switchable
+  // Authentication State: First time starts logged out for phone + OTP login
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [checkingAuth, setCheckingAuth] = useState<boolean>(true);
-  const [userPhone, setUserPhone] = useState("9876543210");
-  const [userName, setUserName] = useState(initialUser?.name || "Nivash K");
+  const [userPhone, setUserPhone] = useState(initialUser?.phone || "");
+  const [userName, setUserName] = useState(initialUser?.name || "");
 
   // Modals State
   const [sparePartsOpen, setSparePartsOpen] = useState(false);
@@ -141,8 +142,8 @@ export default function SevaiGoApp({
   const [rescueProblem, setRescueProblem] = useState("Puncture");
   const [callingShop, setCallingShop] = useState<MechanicView | null>(null);
   const [requestingShop, setRequestingShop] = useState<MechanicView | null>(null);
-  const [rescueName, setRescueName] = useState(initialUser?.name || "Nivash K");
-  const [rescuePhone, setRescuePhone] = useState(initialUser?.phone || "9876543210");
+  const [rescueName, setRescueName] = useState(initialUser?.name || "");
+  const [rescuePhone, setRescuePhone] = useState(initialUser?.phone || "");
   const [rescueNotes, setRescueNotes] = useState("");
   const [rescuePhoto, setRescuePhoto] = useState("");
   const [showRescueMap, setShowRescueMap] = useState(false);
@@ -184,41 +185,63 @@ export default function SevaiGoApp({
     return () => clearTimeout(timeout);
   }, [toast]);
 
-  // Initial load of session & preferences
+  // Restore stored session and cached location on client mount
   useEffect(() => {
     try {
-      const storedLogin = localStorage.getItem("isLoggedIn");
-      if (storedLogin !== null) {
-        setIsLoggedIn(storedLogin === "true");
+      const storedLoggedIn = localStorage.getItem("isLoggedIn");
+      const storedPhone = localStorage.getItem("userPhone");
+      const storedName = localStorage.getItem("userName");
+      if (storedLoggedIn === "true" && storedPhone) {
+        setIsLoggedIn(true);
+        setUserPhone(storedPhone);
+        setUserName(storedName || `Rider ${storedPhone.slice(-4)}`);
+        setRescuePhone(storedPhone);
+        setRescueName(storedName || `Rider ${storedPhone.slice(-4)}`);
+        setUser({
+          id: `u-${storedPhone}`,
+          name: storedName || `Rider ${storedPhone.slice(-4)}`,
+          phone: storedPhone,
+          email: `${storedPhone}@sevaigo.local`,
+          role: "rider",
+        });
       }
-      const phoneStored = localStorage.getItem("userPhone");
-      if (phoneStored) setUserPhone(phoneStored);
-      const nameStored = localStorage.getItem("userName");
-      if (nameStored) setUserName(nameStored);
-      const activeBookingStored = localStorage.getItem("activeBooking");
-      if (activeBookingStored) {
-        try {
-          setActiveBooking(JSON.parse(activeBookingStored));
-        } catch {}
+
+      const cachedLocStr = localStorage.getItem("userSavedLocation");
+      if (cachedLocStr) {
+        const cachedLoc = JSON.parse(cachedLocStr);
+        if (cachedLoc && cachedLoc.latitude && cachedLoc.longitude && cachedLoc.label) {
+          setLocation(cachedLoc);
+        }
       }
     } catch {}
     setCheckingAuth(false);
   }, []);
 
   const handleLoginSuccess = (phone: string, inputName?: string) => {
+    const finalName = inputName || `Rider ${phone.slice(-4)}`;
     try {
       localStorage.setItem("isLoggedIn", "true");
       localStorage.setItem("userPhone", phone);
-      if (inputName) localStorage.setItem("userName", inputName);
+      localStorage.setItem("userName", finalName);
     } catch {}
     setIsLoggedIn(true);
     setUserPhone(phone);
-    if (inputName) setUserName(inputName);
+    setUserName(finalName);
+    setRescuePhone(phone);
+    setRescueName(finalName);
+    setUser({
+      id: `u-${phone}`,
+      name: finalName,
+      phone,
+      email: `${phone}@sevaigo.local`,
+      role: "rider",
+    });
 
     // Sync with Supabase users table
-    void supabase.from("users").insert({
+    void supabase.from("users").upsert({
       phone,
-      name: inputName || `Rider ${phone.slice(-4)}`,
+      name: finalName,
+      updated_at: new Date().toISOString(),
     });
 
     setView("home");
@@ -233,8 +256,11 @@ export default function SevaiGoApp({
     } catch {}
     setIsLoggedIn(false);
     setUser(null);
+    setUserPhone("");
+    setUserName("");
     void apiRequest("/api/auth", jsonOptions({ action: "logout" })).catch(() => {});
     say("Logged out safely.");
+    setView("splash");
   };
 
   const refreshShops = useCallback(
@@ -323,33 +349,80 @@ export default function SevaiGoApp({
     void refreshShops(location);
   }, [location, refreshShops]);
 
-  function detectLocation(targetView?: View) {
-    if (!navigator.geolocation) {
-      say("GPS location is not supported on this device.");
-      return;
-    }
-    setGeoLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const newLoc: MapLocation = {
-          latitude: Number(pos.coords.latitude.toFixed(6)),
-          longitude: Number(pos.coords.longitude.toFixed(6)),
-          label: "Your GPS Location",
-          source: "gps",
-        };
-        setLocation(newLoc);
-        setGeoLoading(false);
-        say(`GPS acquired: ${newLoc.label}`);
-        if (targetView) setView(targetView);
-        void refreshShops(newLoc);
-      },
-      () => {
-        setGeoLoading(false);
-        say("Location access not granted. Using default city.");
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 15000 }
-    );
-  }
+  // Reverse geocoding helper to resolve actual area/locality name
+  const fetchAreaName = async (lat: number, lon: number): Promise<string> => {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=16&addressdetails=1`,
+        { headers: { "Accept-Language": "en" }, signal: AbortSignal.timeout(4500) }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const addr = data.address || {};
+        const area =
+          addr.suburb ||
+          addr.neighbourhood ||
+          addr.residential ||
+          addr.road ||
+          addr.village ||
+          addr.town ||
+          addr.city_district ||
+          addr.city;
+        const city = addr.city || addr.town || addr.county || addr.state_district;
+        if (area && city && area !== city) {
+          return `${area}, ${city}`;
+        }
+        return area || city || "Live GPS Location";
+      }
+    } catch {}
+    return "Live GPS Location";
+  };
+
+  const detectLocation = useCallback(
+    (targetView?: View) => {
+      if (typeof window === "undefined" || !navigator.geolocation) {
+        say("GPS location is not supported on this device.");
+        return;
+      }
+      setGeoLoading(true);
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const lat = Number(pos.coords.latitude.toFixed(6));
+          const lng = Number(pos.coords.longitude.toFixed(6));
+          const areaLabel = await fetchAreaName(lat, lng);
+          const newLoc: MapLocation = {
+            latitude: lat,
+            longitude: lng,
+            label: areaLabel,
+            source: "gps",
+          };
+          setLocation(newLoc);
+          setGeoLoading(false);
+          try {
+            localStorage.setItem("userSavedLocation", JSON.stringify(newLoc));
+          } catch {}
+          say(`Live GPS: ${areaLabel}`);
+          if (targetView) setView(targetView);
+          void refreshShops(newLoc);
+        },
+        (err) => {
+          setGeoLoading(false);
+          if (err.code === 1) {
+            say("Please allow Location permission in your browser to detect your live location.");
+          } else {
+            say("Could not acquire GPS coordinates. Tap to retry.");
+          }
+        },
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 10000 }
+      );
+    },
+    [refreshShops, say]
+  );
+
+  // Trigger live GPS detection automatically on initial mount
+  useEffect(() => {
+    detectLocation();
+  }, [detectLocation]);
 
   const initiateCall = useCallback(
     (shop: MechanicView) => {
@@ -793,7 +866,7 @@ export default function SevaiGoApp({
     return (
       <BikeBackground scene="profile" opacity={0.4}>
         <ProfileView
-          user={user || { id: "u-1", name: userName, phone: userPhone, email: "nivashk@gmail.com", role: "rider" }}
+          user={user || (userPhone ? { id: `u-${userPhone}`, name: userName || `Rider ${userPhone.slice(-4)}`, phone: userPhone, email: `+91 ${userPhone}`, role: "rider" } : null)}
           onNavigate={(target) => goTo(target as View)}
           onLogout={handleFullLogout}
           onOpenOffers={() => setOffersOpen(true)}
@@ -1125,10 +1198,14 @@ export default function SevaiGoApp({
               {/* Brand Header */}
               <div className="flex items-center justify-between pb-6 border-b border-white/10">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF7900] to-[#ea580c] flex items-center justify-center p-0.5">
-                    <div className="w-full h-full rounded-[10px] bg-[#07090C] flex items-center justify-center">
-                      <Bike size={20} className="text-[#FF7900]" />
-                    </div>
+                  <div className="w-10 h-10 rounded-xl overflow-hidden bg-black flex items-center justify-center border border-white/10 shadow-md">
+                    <Image
+                      src="/images/sevaigo-logo.png"
+                      alt="SevaiGo Logo"
+                      width={40}
+                      height={40}
+                      className="w-full h-full object-contain"
+                    />
                   </div>
                   <div>
                     <h2 className="text-lg font-black font-['Manrope'] leading-none">
@@ -1224,11 +1301,16 @@ export default function SevaiGoApp({
           </button>
 
           {/* Center Brand Wordmark */}
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => goTo("home")}>
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#FF7900] to-[#ea580c] p-0.5 shadow-md flex items-center justify-center">
-              <div className="w-full h-full rounded-[9px] bg-[#07090C] flex items-center justify-center">
-                <Bike size={16} className="text-[#FF7900]" />
-              </div>
+          <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => goTo("home")}>
+            <div className="w-8 h-8 rounded-xl overflow-hidden bg-black flex items-center justify-center border border-white/10 shadow-md">
+              <Image
+                src="/images/sevaigo-logo.png"
+                alt="SevaiGo Logo"
+                width={32}
+                height={32}
+                className="w-full h-full object-contain"
+                priority
+              />
             </div>
             <span className="text-xl font-black font-['Manrope'] tracking-tight text-white">
               Sevai<span className="text-[#FF7900]">Go</span>
