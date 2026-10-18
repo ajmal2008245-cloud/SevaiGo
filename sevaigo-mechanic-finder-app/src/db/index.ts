@@ -7,10 +7,13 @@ import { Pool } from "pg";
 import { ensureTables } from "./init";
 
 const databaseUrl = process.env.DATABASE_URL;
-const isVercel = Boolean(
+const isVercelOrServerless = Boolean(
   process.env.VERCEL ||
+  process.env.VERCEL_ENV ||
   process.env.AWS_LAMBDA_FUNCTION_NAME ||
-  process.env.VERCEL_ENV
+  process.env.LAMBDA_TASK_ROOT ||
+  (typeof process.cwd === "function" && (process.cwd().includes("var/task") || process.cwd().includes("/var/task"))) ||
+  process.env.NODE_ENV === "production"
 );
 
 const isRemotePg = Boolean(
@@ -54,7 +57,13 @@ if (isRemotePg && databaseUrl) {
   dbInstance = drizzleNodePg(poolInstance);
 
   if (!globalForDb.__sevaigoInitPromise) {
-    globalForDb.__sevaigoInitPromise = ensureTables(poolInstance);
+    globalForDb.__sevaigoInitPromise = (async () => {
+      try {
+        await ensureTables(poolInstance!);
+      } catch (err) {
+        console.warn("[SevaiGo DB] Remote PostgreSQL table initialization note:", err);
+      }
+    })();
   }
 } else {
   if (!globalForDb.__sevaigoDb) {
@@ -63,30 +72,36 @@ if (isRemotePg && databaseUrl) {
       process.env.npm_lifecycle_event === "build";
 
     let pglite: PGlite;
-    if (isBuild) {
+    if (isBuild || isVercelOrServerless) {
+      // In serverless, Vercel, or production environments without remote DB,
+      // run PGlite in-memory to prevent read-only filesystem errors (e.g. /var/task/.data/sevaigo-db)
+      // and multi-worker directory lock errors completely.
       pglite = new PGlite();
     } else {
-      const dbPath = isVercel
-        ? path.join("/tmp", ".data", "sevaigo-db")
-        : path.join(process.cwd(), ".data", "sevaigo-db");
-
+      // Local development on developer's laptop
+      const dbPath = path.join(process.cwd(), ".data", "sevaigo-db");
       try {
         fs.mkdirSync(dbPath, { recursive: true });
-      } catch (err) {
-        console.warn("[SevaiGo DB] Directory creation warning for", dbPath, err);
-      }
-
-      try {
         pglite = new PGlite(dbPath);
       } catch (err) {
-        console.warn("[SevaiGo DB] Failed to open PGlite with directory, falling back to memory:", err);
+        console.warn("[SevaiGo DB] Local directory initialization warning, using memory:", err);
         pglite = new PGlite();
       }
     }
 
     globalForDb.__sevaigoPgClient = pglite;
     globalForDb.__sevaigoDb = drizzlePglite(pglite);
-    globalForDb.__sevaigoInitPromise = ensureTables(pglite);
+
+    globalForDb.__sevaigoInitPromise = (async () => {
+      try {
+        if (typeof pglite.waitReady?.then === "function") {
+          await pglite.waitReady;
+        }
+        await ensureTables(pglite);
+      } catch (err) {
+        console.warn("[SevaiGo DB] PGlite table verification note:", err);
+      }
+    })();
   }
   dbInstance = globalForDb.__sevaigoDb;
 }

@@ -10,24 +10,29 @@ import { supabase } from "@/lib/supabaseClient";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const params = new URL(request.url).searchParams;
-  const lat = Number(params.get("lat"));
-  const lng = Number(params.get("lng"));
-  const latitude = Number.isFinite(lat) && lat >= -90 && lat <= 90 && params.has("lat") ? lat : DEMO_LOCATION.latitude;
-  const longitude = Number.isFinite(lng) && lng >= -180 && lng <= 180 && params.has("lng") ? lng : DEMO_LOCATION.longitude;
-  const shops = await getNearbyMechanics({
-    latitude,
-    longitude,
-    radiusKm: Number(params.get("radius")) || 5,
-    vehicleType: params.get("vehicle") || "all",
-    problem: params.get("problem") || undefined,
-    search: params.get("search") || "",
-    sort: params.get("sort") || "distance",
-    openOnly: params.get("open") === "true",
-    availableOnly: params.get("available") === "true",
-    includeUnapproved: params.get("includeUnapproved") === "true",
-  });
-  return Response.json({ shops, latitude, longitude }, { headers: { "Cache-Control": "no-store" } });
+  try {
+    const params = new URL(request.url).searchParams;
+    const lat = Number(params.get("lat"));
+    const lng = Number(params.get("lng"));
+    const latitude = Number.isFinite(lat) && lat >= -90 && lat <= 90 && params.has("lat") ? lat : DEMO_LOCATION.latitude;
+    const longitude = Number.isFinite(lng) && lng >= -180 && lng <= 180 && params.has("lng") ? lng : DEMO_LOCATION.longitude;
+    const shops = await getNearbyMechanics({
+      latitude,
+      longitude,
+      radiusKm: Number(params.get("radius")) || 5,
+      vehicleType: params.get("vehicle") || "all",
+      problem: params.get("problem") || undefined,
+      search: params.get("search") || "",
+      sort: params.get("sort") || "distance",
+      openOnly: params.get("open") === "true",
+      availableOnly: params.get("available") === "true",
+      includeUnapproved: params.get("includeUnapproved") === "true",
+    });
+    return Response.json({ shops, latitude, longitude }, { headers: { "Cache-Control": "no-store" } });
+  } catch (err) {
+    console.error("[SevaiGo Mechanics API] GET error:", err);
+    return Response.json({ shops: [], latitude: DEMO_LOCATION.latitude, longitude: DEMO_LOCATION.longitude }, { headers: { "Cache-Control": "no-store" } });
+  }
 }
 
 export async function POST(request: Request) {

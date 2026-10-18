@@ -4,17 +4,18 @@ export type DbExecutor = {
 };
 
 export async function ensureTables(client: DbExecutor) {
-  const execute = async (sql: string) => {
-    if (typeof client.exec === "function") {
-      return client.exec(sql);
-    }
-    if (typeof client.query === "function") {
-      return client.query(sql);
-    }
-    throw new Error("Database client must support exec or query");
-  };
+  try {
+    const execute = async (sql: string) => {
+      if (typeof client.exec === "function") {
+        return client.exec(sql);
+      }
+      if (typeof client.query === "function") {
+        return client.query(sql);
+      }
+      return null;
+    };
 
-  await execute(`
+    await execute(`
     CREATE TABLE IF NOT EXISTS users (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       name text NOT NULL DEFAULT 'SevaiGo User',
@@ -145,4 +146,7 @@ export async function ensureTables(client: DbExecutor) {
       created_at timestamp with time zone NOT NULL DEFAULT now()
     );
   `);
+  } catch (err) {
+    console.warn("[SevaiGo DB] Table initialization non-fatal warning:", err);
+  }
 }
