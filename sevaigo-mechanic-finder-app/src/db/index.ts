@@ -58,22 +58,30 @@ if (isRemotePg && databaseUrl) {
   }
 } else {
   if (!globalForDb.__sevaigoDb) {
-    const dbPath = isVercel
-      ? path.join("/tmp", ".data", "sevaigo-db")
-      : path.join(process.cwd(), ".data", "sevaigo-db");
-
-    try {
-      fs.mkdirSync(dbPath, { recursive: true });
-    } catch (err) {
-      console.warn("[SevaiGo DB] Directory creation warning for", dbPath, err);
-    }
+    const isBuild =
+      process.env.NEXT_PHASE === "phase-production-build" ||
+      process.env.npm_lifecycle_event === "build";
 
     let pglite: PGlite;
-    try {
-      pglite = new PGlite(dbPath);
-    } catch (err) {
-      console.warn("[SevaiGo DB] Failed to open PGlite with directory, falling back to memory:", err);
+    if (isBuild) {
       pglite = new PGlite();
+    } else {
+      const dbPath = isVercel
+        ? path.join("/tmp", ".data", "sevaigo-db")
+        : path.join(process.cwd(), ".data", "sevaigo-db");
+
+      try {
+        fs.mkdirSync(dbPath, { recursive: true });
+      } catch (err) {
+        console.warn("[SevaiGo DB] Directory creation warning for", dbPath, err);
+      }
+
+      try {
+        pglite = new PGlite(dbPath);
+      } catch (err) {
+        console.warn("[SevaiGo DB] Failed to open PGlite with directory, falling back to memory:", err);
+        pglite = new PGlite();
+      }
     }
 
     globalForDb.__sevaigoPgClient = pglite;
