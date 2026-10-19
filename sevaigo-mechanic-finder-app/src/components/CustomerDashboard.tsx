@@ -582,8 +582,8 @@ export default function CustomerDashboard({
   return (
     <div className="min-h-screen w-full bg-[#FFFFFF] text-[#0F172A] pb-24 font-['DM_Sans',sans-serif]">
       {/* 1. Pure White Header */}
-      <header className="sticky top-0 z-40 bg-[#FFFFFF]/95 backdrop-blur-md border-b border-[#E2E8F0] px-4 py-3">
-        <div className="max-w-2xl mx-auto flex items-center justify-between">
+      <header className="sticky top-0 z-40 bg-[#FFFFFF]/95 backdrop-blur-md border-b border-[#E2E8F0] px-5 py-3.5 sm:px-6">
+        <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
           {/* Logo & Role Badge */}
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl overflow-hidden bg-black flex items-center justify-center border border-slate-200 shadow-sm">
@@ -610,15 +610,15 @@ export default function CustomerDashboard({
           </div>
 
           {/* User Phone & Sign Out */}
-          <div className="flex items-center gap-2">
-            <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#F8FAFC] border border-[#E2E8F0] text-xs font-bold text-[#0F172A]">
+          <div className="flex items-center gap-2.5">
+            <div className="hidden sm:flex items-center gap-1.5 h-9 px-3 rounded-full bg-[#F8FAFC] border border-[#E2E8F0] text-xs font-bold text-[#0F172A]">
               <User size={13} className="text-[#FF7900]" />
               <span>{user.phone}</span>
             </div>
             <button
               type="button"
               onClick={onLogout}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-xs font-bold text-red-600 border border-red-200 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 h-9 px-3.5 rounded-xl bg-red-50 hover:bg-red-100 text-xs font-bold text-red-600 border border-red-200 transition-colors cursor-pointer"
               title="Sign Out"
             >
               <LogOut size={13} />
@@ -721,7 +721,7 @@ export default function CustomerDashboard({
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm font-extrabold text-[#0F172A]">{activeRescue.shop.shopName}</h3>
-                  <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
                     Verified Mechanic
                   </span>
                 </div>
@@ -766,8 +766,11 @@ export default function CustomerDashboard({
                 Provide your breakdown info to dispatch the nearest verified mechanic within 7 km
               </p>
             </div>
-            <span className="w-8 h-8 rounded-full bg-orange-50 text-[#FF7900] border border-orange-200 flex items-center justify-center font-bold text-xs">
-              1
+            <span
+              className="px-2.5 py-1 rounded-full bg-orange-50 text-[#FF7900] border border-orange-200 text-xs font-extrabold tracking-wide shrink-0"
+              aria-label="Step 1 of 2: Breakdown Details"
+            >
+              Step 1 of 2
             </span>
           </div>
 
@@ -778,7 +781,7 @@ export default function CustomerDashboard({
               <span>Current Bike Breakdown Location *</span>
             </label>
             <div className="flex items-center gap-2">
-              <div className="flex-1 p-3 rounded-xl bg-[#F8FAFC] border border-[#CBD5E1] flex items-center gap-2 text-xs">
+              <div className="flex-1 h-11 px-3.5 rounded-xl bg-[#F8FAFC] border border-[#CBD5E1] flex items-center gap-2 text-xs">
                 <MapPin size={16} className="text-[#FF7900] shrink-0" />
                 <span className="font-semibold text-[#0F172A] truncate">{locationLabel}</span>
                 <span className="ml-auto text-[10px] text-[#64748B] font-mono shrink-0">
@@ -789,7 +792,7 @@ export default function CustomerDashboard({
                 type="button"
                 onClick={detectLocation}
                 disabled={detectingGps}
-                className="px-3.5 py-3 rounded-xl bg-orange-50 hover:bg-orange-100 text-[#FF7900] border border-orange-200 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                className="h-11 px-4 rounded-xl bg-[#FF7900] hover:bg-[#ea580c] disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-sm"
                 title="Detect current GPS location"
               >
                 <LocateFixed size={15} className={detectingGps ? "animate-spin" : ""} />
@@ -805,21 +808,21 @@ export default function CustomerDashboard({
                   value={locationSearchQuery}
                   onChange={(e) => setLocationSearchQuery(e.target.value)}
                   placeholder="Type breakdown area (e.g. Nallagoundanpalayam, Gobichettipalayam, Erode, 638452)..."
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[#F8FAFC] border border-[#CBD5E1] text-xs text-[#0F172A] placeholder:text-slate-400 focus:outline-none focus:border-[#FF7900]"
+                  className="w-full h-11 pl-10 pr-3 rounded-xl bg-[#F8FAFC] border border-[#CBD5E1] text-xs text-[#0F172A] placeholder:text-slate-400 focus:outline-none focus:border-[#FF7900]"
                 />
-                <Search size={14} className="absolute left-3 top-3 text-slate-400" />
+                <Search size={15} className="absolute left-3.5 top-3.5 text-slate-400" />
               </div>
               <button
                 type="submit"
                 disabled={isSearchingLocation || !locationSearchQuery.trim()}
-                className="px-3.5 py-2.5 rounded-xl bg-[#FF7900] hover:bg-[#ea580c] disabled:opacity-50 text-white text-xs font-bold transition-colors cursor-pointer shrink-0"
+                className="h-11 px-4 rounded-xl bg-[#FF7900] hover:bg-[#ea580c] disabled:opacity-50 text-white text-xs font-bold transition-colors cursor-pointer shrink-0 shadow-sm"
               >
                 {isSearchingLocation ? "Searching..." : "Set Location"}
               </button>
               <button
                 type="button"
                 onClick={() => setShowBreakdownMap(!showBreakdownMap)}
-                className="px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer shrink-0"
+                className="h-11 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer shrink-0"
               >
                 {showBreakdownMap ? "Hide Map" : "📍 Pick Spot on Map"}
               </button>
@@ -853,25 +856,25 @@ export default function CustomerDashboard({
               <button
                 type="button"
                 onClick={() => setVehicleType("2w")}
-                className={`p-3.5 rounded-xl border-2 flex items-center justify-center gap-2.5 font-bold text-sm transition-all cursor-pointer ${
+                className={`h-12 rounded-xl border-2 flex items-center justify-center gap-2.5 font-bold text-xs sm:text-sm transition-all cursor-pointer ${
                   vehicleType === "2w"
-                    ? "bg-orange-50 border-[#FF7900] text-[#FF7900] shadow-sm"
-                    : "bg-[#FFFFFF] border-[#E2E8F0] text-[#64748B] hover:border-slate-300"
+                    ? "bg-orange-50 border-[#FF7900] text-[#FF7900] shadow-sm ring-1 ring-[#FF7900]/20"
+                    : "bg-[#FFFFFF] border-[#E2E8F0] text-slate-700 hover:border-slate-300"
                 }`}
               >
-                <Bike size={20} />
+                <Bike size={22} strokeWidth={2.4} className={vehicleType === "2w" ? "text-[#FF7900]" : "text-slate-700"} />
                 <span>2-Wheeler (Bike / Scooter)</span>
               </button>
               <button
                 type="button"
                 onClick={() => setVehicleType("4w")}
-                className={`p-3.5 rounded-xl border-2 flex items-center justify-center gap-2.5 font-bold text-sm transition-all cursor-pointer ${
+                className={`h-12 rounded-xl border-2 flex items-center justify-center gap-2.5 font-bold text-xs sm:text-sm transition-all cursor-pointer ${
                   vehicleType === "4w"
-                    ? "bg-orange-50 border-[#FF7900] text-[#FF7900] shadow-sm"
-                    : "bg-[#FFFFFF] border-[#E2E8F0] text-[#64748B] hover:border-slate-300"
+                    ? "bg-orange-50 border-[#FF7900] text-[#FF7900] shadow-sm ring-1 ring-[#FF7900]/20"
+                    : "bg-[#FFFFFF] border-[#E2E8F0] text-slate-700 hover:border-slate-300"
                 }`}
               >
-                <Car size={20} />
+                <Car size={22} strokeWidth={2.4} className={vehicleType === "4w" ? "text-[#FF7900]" : "text-slate-700"} />
                 <span>4-Wheeler (Car / Van)</span>
               </button>
             </div>
@@ -890,14 +893,16 @@ export default function CustomerDashboard({
                     key={item.id}
                     type="button"
                     onClick={() => setIssue(item.id)}
-                    className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                    className={`p-3 rounded-xl border-2 text-left flex flex-col justify-between transition-all cursor-pointer ${
                       isSelected
-                        ? "bg-orange-50 border-[#FF7900] text-[#FF7900] shadow-sm"
-                        : "bg-[#FFFFFF] border-[#E2E8F0] text-[#0F172A] hover:border-slate-300"
+                        ? "bg-orange-50/70 border-[#FF7900] shadow-sm ring-1 ring-[#FF7900]/20"
+                        : "bg-[#FFFFFF] border-[#E2E8F0] hover:border-slate-300"
                     }`}
                   >
-                    <span className="text-xs font-bold">{item.label}</span>
-                    <span className="text-[10px] text-[#64748B] mt-1 font-semibold">{item.est}</span>
+                    <span className="text-xs font-bold text-[#0F172A] leading-snug">{item.label}</span>
+                    <span className={`text-[10px] mt-1.5 ${isSelected ? "text-[#C2410C] font-bold" : "text-[#64748B] font-semibold"}`}>
+                      {item.est}
+                    </span>
                   </button>
                 );
               })}
@@ -909,7 +914,7 @@ export default function CustomerDashboard({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Any landmark or details (e.g. Near bus stop, tyre burst)"
-              className="mt-2.5 w-full px-3.5 py-2.5 rounded-xl bg-[#F8FAFC] border border-[#CBD5E1] text-xs text-[#0F172A] focus:outline-none focus:border-[#FF7900]"
+              className="mt-2.5 w-full h-11 px-3.5 rounded-xl bg-[#F8FAFC] border border-[#CBD5E1] text-xs text-[#0F172A] focus:outline-none focus:border-[#FF7900]"
             />
           </div>
 
@@ -1011,7 +1016,7 @@ export default function CustomerDashboard({
                       <div>
                         <div className="flex items-center gap-2">
                           <h3 className="text-base font-extrabold text-[#0F172A]">{shop.shopName}</h3>
-                          <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200 flex items-center gap-0.5">
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200 flex items-center gap-0.5">
                             <ShieldCheck size={11} /> Verified
                           </span>
                         </div>
@@ -1073,7 +1078,7 @@ export default function CustomerDashboard({
                       {/* 1. Direct Call */}
                       <a
                         href={`tel:${shop.phone}`}
-                        className="flex-1 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-900 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors text-center"
+                        className="flex-1 h-10 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-900 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors text-center"
                       >
                         <Phone size={14} className="text-[#FF7900]" />
                         <span>Call</span>
@@ -1083,7 +1088,7 @@ export default function CustomerDashboard({
                       <button
                         type="button"
                         onClick={() => triggerWhatsAppRescue(shop)}
-                        className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer text-center"
+                        className="flex-1 h-10 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer text-center"
                       >
                         <Send size={14} className="text-emerald-600" />
                         <span>WhatsApp</span>
@@ -1094,7 +1099,7 @@ export default function CustomerDashboard({
                         type="button"
                         disabled={isSubmittingThis || isRequested}
                         onClick={() => submitRescueRequest(shop)}
-                        className={`flex-[1.5] py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                        className={`flex-[1.5] h-10 px-3.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                           isRequested
                             ? "bg-emerald-600 text-white shadow-sm"
                             : "bg-[#FF7900] hover:bg-[#ea580c] text-white shadow-sm"
