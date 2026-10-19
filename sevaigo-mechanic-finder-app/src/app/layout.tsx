@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import "leaflet/dist/leaflet.css";
 import "./globals.css";
+import DeviceShell from "@/components/DeviceShell";
 
 export const metadata: Metadata = {
   title: "SevaiGo — Roadside Motorcycle Assistance",
@@ -44,7 +45,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <meta name="apple-mobile-web-app-title" content="SevaiGo" />
         <meta name="theme-color" content="#FF7900" />
       </head>
-      <body>{children}</body>
+      <body>
+        <DeviceShell>{children}</DeviceShell>
+      </body>
     </html>
   );
 }
