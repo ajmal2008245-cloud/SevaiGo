@@ -6,12 +6,14 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
+  ChevronDown,
   Flame,
   Info,
   Lock,
   Phone,
   RotateCw,
   ShieldCheck,
+  Sparkles,
   Store,
   User,
   Wrench,
@@ -247,8 +249,8 @@ export default function LoginView({
             Sevai<span className="text-[#FF7900]">Go</span>
           </span>
         </div>
-        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FF7900]/10 border border-[#FF7900]/25 text-[11px] font-bold text-[#FF7900]">
-          <Flame size={13} />
+        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FF7900]/10 border border-[#FF7900]/25 text-xs font-bold text-[#FF7900]">
+          <Flame size={14} />
           <span>Phone OTP Verification</span>
         </div>
       </div>
@@ -274,18 +276,26 @@ export default function LoginView({
           </p>
         </div>
 
-        {/* TWO LOGIN TYPES TOGGLE: Customer Login vs Mechanic Login */}
-        <div className="mb-5 p-1 rounded-2xl bg-[#F1F5F9] border border-[#E2E8F0] grid grid-cols-2 gap-1">
+        {/* TWO LOGIN TYPES TOGGLE: Customer Login vs Mechanic Login (High contrast & ARIA tablist) */}
+        <div
+          role="tablist"
+          aria-label="Account Login Type"
+          className="mb-5 p-1 rounded-2xl bg-slate-100 border border-slate-200 grid grid-cols-2 gap-1.5"
+        >
           <button
             type="button"
+            role="tab"
+            id="tab-customer"
+            aria-selected={loginType === "customer"}
+            aria-controls="login-form-panel"
             onClick={() => {
               setLoginType("customer");
               setError("");
             }}
-            className={`py-2.5 px-3 rounded-xl font-['Manrope'] text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            className={`py-3 px-3.5 rounded-xl font-['Manrope'] text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
               loginType === "customer"
-                ? "bg-[#FFFFFF] text-[#FF7900] shadow-sm border border-[#E2E8F0]"
-                : "text-[#64748B] hover:text-[#0F172A]"
+                ? "bg-[#FF7900] text-white shadow-md shadow-[#FF7900]/25 border border-[#FF7900]"
+                : "bg-white text-slate-700 hover:text-slate-950 hover:bg-slate-50 border border-slate-200 shadow-xs"
             }`}
           >
             <User size={15} />
@@ -294,14 +304,18 @@ export default function LoginView({
 
           <button
             type="button"
+            role="tab"
+            id="tab-mechanic"
+            aria-selected={loginType === "mechanic"}
+            aria-controls="login-form-panel"
             onClick={() => {
               setLoginType("mechanic");
               setError("");
             }}
-            className={`py-2.5 px-3 rounded-xl font-['Manrope'] text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            className={`py-3 px-3.5 rounded-xl font-['Manrope'] text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
               loginType === "mechanic"
-                ? "bg-[#FFFFFF] text-[#FF7900] shadow-sm border border-[#E2E8F0]"
-                : "text-[#64748B] hover:text-[#0F172A]"
+                ? "bg-[#FF7900] text-white shadow-md shadow-[#FF7900]/25 border border-[#FF7900]"
+                : "bg-white text-slate-700 hover:text-slate-950 hover:bg-slate-50 border border-slate-200 shadow-xs"
             }`}
           >
             <Wrench size={15} />
@@ -309,32 +323,35 @@ export default function LoginView({
           </button>
         </div>
 
-        {/* Role Description Banner */}
-        <div className="mb-4 p-3 rounded-xl bg-[#FFF7ED] border border-[#FED7AA] flex items-center gap-2.5">
-          {loginType === "customer" ? (
-            <>
-              <User size={16} className="text-[#FF7900] shrink-0" />
-              <div className="text-[11px] text-[#9A3412] leading-tight">
-                <strong>Customer Account:</strong> Search mechanics, book bike repairs & request emergency roadside rescue.
-              </div>
-            </>
-          ) : (
-            <>
-              <Store size={16} className="text-[#FF7900] shrink-0" />
-              <div className="text-[11px] text-[#9A3412] leading-tight">
-                <strong>Mechanic Partner Account:</strong> Register your workshop, receive nearby rescue calls & manage jobs.
-              </div>
-            </>
-          )}
-        </div>
+        {/* Card Body with Integrated Context Header */}
+        <div
+          id="login-form-panel"
+          role="tabpanel"
+          aria-labelledby={loginType === "customer" ? "tab-customer" : "tab-mechanic"}
+          className="p-6 pb-8 sm:p-7 sm:pb-8 rounded-2xl bg-[#FFFFFF] border border-[#E2E8F0] shadow-[0_10px_35px_rgba(0,0,0,0.06)]"
+        >
+          {/* Integrated Role Context (Unites tab with form directly) */}
+          <div className="mb-5 pb-3.5 border-b border-slate-100 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-orange-50 border border-orange-200 text-[#FF7900] flex items-center justify-center shrink-0">
+              {loginType === "customer" ? <User size={16} /> : <Store size={16} />}
+            </div>
+            <div>
+              <h2 className="text-xs font-bold text-[#0F172A] leading-tight">
+                {loginType === "customer" ? "Customer Account Sign In" : "Mechanic Partner Sign In"}
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {loginType === "customer"
+                  ? "Search nearby mechanics & request roadside emergency rescue"
+                  : "Workshop owner sign-in, manage bookings & incoming calls"}
+              </p>
+            </div>
+          </div>
 
-        {/* Card Body */}
-        <div className="p-6 rounded-3xl bg-[#FFFFFF] border border-[#E2E8F0] shadow-[0_10px_35px_rgba(0,0,0,0.06)]">
           {step === "phone" ? (
             /* STEP 1: MOBILE NUMBER INPUT */
             <form onSubmit={handleSendOtp} className="space-y-4">
               <div>
-                <label className="text-xs font-bold text-[#0F172A] block mb-1.5 flex items-center gap-1.5">
+                <label className="text-xs font-bold text-[#0F172A] block mb-2.5 flex items-center gap-2">
                   <Phone size={14} className="text-[#FF7900]" />
                   <span>Enter Mobile Number</span>
                 </label>
@@ -360,7 +377,7 @@ export default function LoginView({
               </div>
 
               <div>
-                <label className="text-xs font-bold text-[#64748B] block mb-1.5 flex items-center gap-1.5">
+                <label className="text-xs font-bold text-[#64748B] block mb-2 flex items-center gap-2">
                   <User size={14} className="text-[#64748B]" />
                   <span>Your Full Name (Optional)</span>
                 </label>
@@ -380,23 +397,25 @@ export default function LoginView({
                 </div>
               )}
 
-              <button
-                type="submit"
-                disabled={loading || phone.replace(/\D/g, "").length !== 10}
-                className="w-full py-3.5 rounded-xl bg-[#FF7900] hover:bg-[#ea580c] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm tracking-wide shadow-md shadow-[#FF7900]/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                {loading ? (
-                  <>
-                    <RotateCw size={16} className="animate-spin" />
-                    <span>Sending Code...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Send Verification Code</span>
-                    <ArrowRight size={16} />
-                  </>
-                )}
-              </button>
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={loading || phone.replace(/\D/g, "").length !== 10}
+                  className="w-full py-3.5 rounded-xl bg-[#FF7900] hover:bg-[#ea580c] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm tracking-wide shadow-md shadow-[#FF7900]/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {loading ? (
+                    <>
+                      <RotateCw size={16} className="animate-spin" />
+                      <span>Sending Code...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Send Verification Code</span>
+                      <ArrowRight size={16} />
+                    </>
+                  )}
+                </button>
+              </div>
 
               {loginType === "mechanic" && onRegisterWorkshop && (
                 <div className="pt-2 text-center border-t border-slate-100">
@@ -513,38 +532,43 @@ export default function LoginView({
           )}
         </div>
 
-        {/* Quick Test Numbers Accordion */}
+        {/* Quick Test Numbers Disclosure (Collapsed by default to eliminate visual noise for real users) */}
         {showTestCards && (
-          <div className="mt-5 p-4 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0]">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold text-[#64748B] uppercase tracking-wider">
-                Quick Test Credentials
-              </span>
-              <span className="text-[10px] text-[#FF7900] font-bold">1-Click Autofill</span>
-            </div>
-            <div className="space-y-1.5">
+          <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50/80 overflow-hidden group">
+            <summary className="p-3 flex items-center justify-between cursor-pointer hover:bg-slate-100/70 transition-colors list-none select-none">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-slate-700">Quick Test Credentials</span>
+                <span className="text-xs text-slate-400 font-normal">(Demo / QA)</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                <Sparkles size={12} className="text-slate-400" />
+                <span>Tap to autofill</span>
+                <ChevronDown size={14} className="text-slate-400 group-open:rotate-180 transition-transform" />
+              </div>
+            </summary>
+            <div className="p-3 pt-1 border-t border-slate-200/60 space-y-1.5">
               {FIREBASE_TEST_PHONE_NUMBERS.slice(0, 3).map((testNum) => (
                 <button
                   key={testNum.phoneNumber}
                   type="button"
                   onClick={() => handleSelectTestNumber(testNum)}
-                  className="w-full p-2.5 rounded-xl bg-[#FFFFFF] hover:bg-[#F1F5F9] border border-[#E2E8F0] flex items-center justify-between text-left transition-colors cursor-pointer"
+                  className="w-full p-2.5 rounded-lg bg-white hover:bg-orange-50/60 border border-slate-200 hover:border-orange-200 flex items-center justify-between text-left transition-colors cursor-pointer"
                 >
                   <div>
-                    <span className="text-xs font-bold text-[#0F172A] block font-mono">
+                    <span className="text-xs font-bold text-slate-900 block font-mono">
                       {testNum.phoneNumber}
                     </span>
-                    <span className="text-[10px] text-[#64748B]">{testNum.label}</span>
+                    <span className="text-xs text-slate-500">{testNum.label}</span>
                   </div>
                   <div className="text-right">
-                    <span className="text-[10px] font-mono text-[#16a34a] font-bold px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200">
+                    <span className="text-xs font-mono text-emerald-700 font-bold px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200">
                       OTP: {testNum.testVerificationCode}
                     </span>
                   </div>
                 </button>
               ))}
             </div>
-          </div>
+          </details>
         )}
       </div>
 

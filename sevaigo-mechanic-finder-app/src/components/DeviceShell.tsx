@@ -60,72 +60,27 @@ export default function DeviceShell({ children }: DeviceShellProps) {
         <div className="desktop-glow desktop-glow-blue" />
         <div className="desktop-grid-pattern" />
 
-        {/* Desktop Top Header Bar */}
-        <header className="desktop-top-header">
-          {/* Brand Info */}
-          <div className="desktop-brand">
-            <div className="desktop-brand-logo">
-              <Image
-                src="/images/sevaigo-logo.png"
-                alt="SevaiGo Logo"
-                width={30}
-                height={30}
-                className="object-contain"
-                priority
-              />
-            </div>
-            <div>
-              <div className="desktop-brand-title">
-                Sevai<span>Go</span>
-              </div>
-              <div className="desktop-brand-subtitle">
-                Roadside Assistance • Partner Network
-              </div>
-            </div>
-          </div>
-
-          {/* Center Device Specs Pill */}
-          <div className="desktop-device-badge">
-            <span className="live-pulse-dot" />
-            <Smartphone size={14} className="text-[#FF7900]" />
-            <span className="font-bold text-slate-200">iPhone 15 Pro</span>
-            <span className="text-slate-500 font-normal">|</span>
-            <span className="text-slate-400 text-xs">iOS 18 Preview</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#FF7900]/15 text-[#FF7900] font-bold">
-              393 × 852
-            </span>
-          </div>
-
-          {/* Right Action Controls */}
-          <div className="desktop-actions">
-            <button
-              type="button"
-              onClick={() => setIsFullscreen((prev) => !prev)}
-              className="desktop-control-btn"
-              title={isFullscreen ? "Switch to iPhone Mockup View" : "Expand to Fullscreen View"}
-            >
-              {isFullscreen ? (
-                <>
-                  <Minimize2 size={13} className="text-[#FF7900]" />
-                  <span>Phone Frame</span>
-                </>
-              ) : (
-                <>
-                  <Maximize2 size={13} />
-                  <span>Full Screen</span>
-                </>
-              )}
-            </button>
-          </div>
-        </header>
-
-        {/* Desktop Bottom Footer Notice */}
-        <footer className="desktop-bottom-footer">
-          <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
-            <Sparkles size={13} className="text-[#FF7900]" />
-            <span>Interactive Mobile Simulator • Click, type, test GPS and live tracking directly</span>
-          </div>
-        </footer>
+        {/* Minimalist Floating Screen Mode Toggle in Top-Right (No distracting page-within-a-page header) */}
+        <div className="desktop-floating-controls pointer-events-auto">
+          <button
+            type="button"
+            onClick={() => setIsFullscreen((prev) => !prev)}
+            className="desktop-control-btn"
+            title={isFullscreen ? "Switch to Phone Frame Preview" : "Expand to Fullscreen"}
+          >
+            {isFullscreen ? (
+              <>
+                <Minimize2 size={13} className="text-[#FF7900]" />
+                <span>Phone Preview</span>
+              </>
+            ) : (
+              <>
+                <Maximize2 size={13} />
+                <span>Full Screen</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* 2. Device Chassis & Realistic Black Titanium Frame */}
