@@ -326,21 +326,69 @@ export default function RegisterShopFlow({
         businessDoc: businessDoc.trim() || undefined,
       };
 
-      // Server-side registration call: prevents CORS, network blocks, and credentials exposure
-      const res = await fetch("/api/register-shop", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      let registrationSuccess = false;
+      let returnedShop: any = null;
+      let failureErrorMsg = "";
 
-      const data = await res.json().catch(() => null);
+      // 1. Primary: Server-side registration call to /api/register-shop
+      try {
+        const res = await fetch("/api/register-shop", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
 
-      if (!res.ok || !data?.success) {
-        throw new Error(data?.error || `Registration failed with status ${res.status}. Please try again.`);
+        const data = await res.json().catch(() => null);
+
+        if (res.ok && data?.success) {
+          registrationSuccess = true;
+          returnedShop = data.shop;
+        } else if (data?.error) {
+          failureErrorMsg = data.error;
+        }
+      } catch (primaryErr: any) {
+        console.warn("Primary register-shop endpoint warning, trying fallback:", primaryErr);
       }
 
-      const s = data.shop || {};
-      const returnedServices = Array.isArray(s.services) ? s.services : servicesList;
+      // 2. Secondary Fallback: /api/mechanics
+      if (!registrationSuccess) {
+        try {
+          const resFallback = await fetch("/api/mechanics", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const fbData = await resFallback.json().catch(() => null);
+          if (resFallback.ok && (fbData?.shop || fbData?.mechanic || fbData?.success)) {
+            registrationSuccess = true;
+            returnedShop = fbData.shop || fbData.mechanic;
+          } else if (fbData?.error) {
+            failureErrorMsg = fbData.error;
+          }
+        } catch (fbErr: any) {
+          console.warn("Fallback mechanics endpoint warning:", fbErr);
+        }
+      }
+
+      if (!registrationSuccess) {
+        const cleanMsg = failureErrorMsg.replace(/^(TypeError:\s*|Error:\s*)/i, "");
+        if (
+          !cleanMsg ||
+          cleanMsg.includes("fetch failed") ||
+          cleanMsg.includes("Failed to fetch") ||
+          cleanMsg.includes("NetworkError")
+        ) {
+          throw new Error("Unable to reach the registration server. Please check your internet connection and try again.");
+        }
+        throw new Error(cleanMsg);
+      }
+
+      const s = returnedShop || {};
+      const returnedServices = Array.isArray(s.services)
+        ? s.services
+        : Array.isArray(s.specializations)
+        ? s.specializations
+        : servicesList;
 
       setExistingShop({
         id: s.id || `shop-${Date.now()}`,
@@ -350,8 +398,8 @@ export default function RegisterShopFlow({
         shopPhone: s.phone || (shopPhone.trim() || phone.trim()),
         address: s.address || fullAddress,
         city: city.trim() || "Chennai",
-        latitude: s.lat || pickedCoords.latitude,
-        longitude: s.lng || pickedCoords.longitude,
+        latitude: s.lat || s.latitude || pickedCoords.latitude,
+        longitude: s.lng || s.longitude || pickedCoords.longitude,
         vehicleTypes,
         specializations: returnedServices,
         openTime,
@@ -379,11 +427,16 @@ export default function RegisterShopFlow({
       await fetchOwnerShop();
     } catch (err: any) {
       console.error("Workshop registration error:", err);
-      const msg = err?.message || "Registration failed. Please check your network and try again.";
-      if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
-        setErrorMessage("Network error: Could not reach the registration server. Please check your internet connection.");
+      const raw = String(err?.message || err || "");
+      if (
+        raw.includes("fetch failed") ||
+        raw.includes("Failed to fetch") ||
+        raw.includes("NetworkError") ||
+        raw.includes("TypeError")
+      ) {
+        setErrorMessage("Network error: Could not connect to the registration server. Please check your connection and tap Complete Registration again.");
       } else {
-        setErrorMessage(msg);
+        setErrorMessage(raw.replace(/^(TypeError:\s*|Error:\s*)/i, ""));
       }
     } finally {
       setSubmitting(false);
