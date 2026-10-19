@@ -75,6 +75,8 @@ export async function GET(request: Request) {
             owner_name: matchedLocal.ownerName,
             phone: matchedLocal.shopPhone || matchedLocal.phone,
             address: matchedLocal.address,
+            city: matchedLocal.city || "",
+            pincode: matchedLocal.pincode || "",
             lat: matchedLocal.latitude,
             lng: matchedLocal.longitude,
             services: matchedLocal.specializations || [],
@@ -229,6 +231,9 @@ export async function POST(request: Request) {
 
     // 3. Supabase Cloud Sync (with safe 4-second timeout to prevent network hang or fetch failed crash)
     try {
+      const sparePartsTags = (Array.isArray(body.spareParts) ? body.spareParts : []).map((p: string) => "spare:" + p);
+      const servicesWithSpares = Array.from(new Set([...servicesList, ...sparePartsTags]));
+
       const supaInsertPromise = supabase
         .from("shops")
         .insert({
@@ -238,7 +243,7 @@ export async function POST(request: Request) {
           address: fullAddress,
           lat: latitude,
           lng: longitude,
-          services: servicesList,
+          services: servicesWithSpares,
           verified: true,
         })
         .select();

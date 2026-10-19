@@ -18,6 +18,9 @@ type Props = {
   pickedLocation?: { latitude: number; longitude: number } | null;
   onPickLocation?: (coords: { latitude: number; longitude: number }) => void;
   onCallMechanic?: (shop: MechanicView) => void;
+  trackingMode?: boolean;
+  customerLocation?: { latitude: number; longitude: number; label?: string } | null;
+  mechanicLocation?: { latitude: number; longitude: number; label?: string; etaMinutes?: number; shopName?: string } | null;
 };
 
 const wrenchSvg = '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4l-5.6 5.6a2 2 0 0 0 2.8 2.8l5.6-5.6a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.8-2.8 2.6-2.6Z"/></svg>';
@@ -33,6 +36,9 @@ export default function MechanicMap({
   pickedLocation = null,
   onPickLocation = () => {},
   onCallMechanic,
+  trackingMode = false,
+  customerLocation = null,
+  mechanicLocation = null,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Leaflet.Map | null>(null);
@@ -156,6 +162,50 @@ export default function MechanicMap({
     if (!ready || !L || !map || !group) return;
     group.clearLayers();
 
+    if (trackingMode && customerLocation && mechanicLocation) {
+      // 1. Customer Breakdown Marker (Red Pin with pulse)
+      const customerIcon = L.divIcon({
+        className: "map-icon-reset",
+        html: `<div class="map-shop-pin active" style="background:#dc2626;border-color:#ffffff;box-shadow:0 0 16px rgba(220,38,38,0.7);"><span style="font-size:18px;">📍</span></div>`,
+        iconSize: [46, 52],
+        iconAnchor: [23, 48],
+      });
+      L.marker([customerLocation.latitude, customerLocation.longitude], { icon: customerIcon, zIndexOffset: 800 })
+        .bindTooltip(`📍 Breakdown: ${customerLocation.label || "Your Spot"}`, { permanent: true, direction: "top", offset: [0, -12], className: "map-tooltip-badge" })
+        .addTo(group);
+
+      // 2. Mechanic Live Moving Marker (Green Pin with Pulsing radar)
+      const mechanicIcon = L.divIcon({
+        className: "map-icon-reset",
+        html: `<div class="map-shop-pin active" style="background:#16a34a;border-color:#ffffff;box-shadow:0 0 20px rgba(22,163,74,0.8);"><span style="color:#ffffff;">${wrenchSvg}</span></div>`,
+        iconSize: [48, 54],
+        iconAnchor: [24, 50],
+      });
+      L.marker([mechanicLocation.latitude, mechanicLocation.longitude], { icon: mechanicIcon, zIndexOffset: 900 })
+        .bindTooltip(`👨‍🔧 ${mechanicLocation.shopName || "Mechanic"} (ETA: ~${mechanicLocation.etaMinutes || 5}m)`, { permanent: true, direction: "top", offset: [0, -12], className: "map-tooltip-badge" })
+        .addTo(group);
+
+      // 3. Glowing Route Polyline
+      L.polyline(
+        [
+          [customerLocation.latitude, customerLocation.longitude],
+          [mechanicLocation.latitude, mechanicLocation.longitude],
+        ],
+        { color: "#ea580c", weight: 5, opacity: 0.9, dashArray: "8, 10" }
+      ).addTo(group);
+
+      try {
+        map.fitBounds(
+          [
+            [customerLocation.latitude, customerLocation.longitude],
+            [mechanicLocation.latitude, mechanicLocation.longitude],
+          ],
+          { padding: [50, 50], maxZoom: 16 }
+        );
+      } catch {}
+      return;
+    }
+
     if (pickerMode) {
       // In picker mode, show picked location marker
       if (pickedLocation) {
@@ -250,7 +300,7 @@ export default function MechanicMap({
 
   useEffect(() => {
     if (ready && pickerMode && pickedLocation) {
-      mapRef.current?.panTo([pickedLocation.latitude, pickedLocation.longitude], { animate: true, duration: 0.5 });
+      mapRef.current?.setView([pickedLocation.latitude, pickedLocation.longitude], 15);
     }
   }, [pickedLocation?.latitude, pickedLocation?.longitude, ready, pickerMode]);
 

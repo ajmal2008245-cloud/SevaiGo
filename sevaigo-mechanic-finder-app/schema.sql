@@ -164,14 +164,6 @@ INSERT INTO mechanics (
   4.9, 28, ARRAY['/images/workshop-1.jpg'], true, 'approved', 'available', 250, 2500, 3, true
 ),
 (
-  '744ed467-2811-4c21-bac5-25856d86b4de', 'ajju-bike-mechanic-shop-764815',
-  'ajju bike mechanic shop', 'ajmal hussain u', '/images/owner-1.jpg',
-  '8667084522', 'gobichettipalayam,nallagoundanpalayam', 'Chennai', '600001', '8667084522',
-  13.0597, 80.2514, ARRAY['4w', '2w'], ARRAY['Engine repair', 'AC repair'],
-  ARRAY['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], '08:00', '21:00',
-  4.8, 19, ARRAY['/images/workshop-1.jpg'], true, 'approved', 'available', 300, 2500, 5, true
-),
-(
   '3d6dea57-793b-4102-b25b-c430315dd350', 'ajju-motors-9536a1',
   'ajju motors', 'Ajmal huusain u', '/images/owner-1.jpg',
   '8667084522', 'gobichettipalayam,nallagoundanpalayam', 'erode', '638452', '8667084522',

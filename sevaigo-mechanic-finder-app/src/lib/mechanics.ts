@@ -247,13 +247,37 @@ export async function getNearbyMechanics(query: MechanicQuery): Promise<Mechanic
       .filter((shop: MechanicView) => matchesVehicleType(shop.vehicleTypes, query.vehicleType))
       .filter((shop: MechanicView) => matchesProblem(shop.specializations, query.problem));
 
-      if (supaShops.length > 0) {
-        return [...supaShops, ...shops.filter((s) => !supaShops.some((sup) => sup.id === s.id))];
+      const combined = supaShops.length > 0
+        ? [...supaShops, ...shops.filter((s) => !supaShops.some((sup) => sup.id === s.id || (sup.phone && sup.phone === s.phone)))]
+        : shops;
+
+      const seenIds = new Set<string>();
+      const seenPhones = new Set<string>();
+      const uniqueShops: MechanicView[] = [];
+      for (const s of combined) {
+        const cleanPhone = (s.phone || "").replace(/\D/g, "").slice(-10);
+        if (seenIds.has(s.id)) continue;
+        if (cleanPhone && seenPhones.has(cleanPhone)) continue;
+        seenIds.add(s.id);
+        if (cleanPhone) seenPhones.add(cleanPhone);
+        uniqueShops.push(s);
       }
+      return uniqueShops;
     }
   } catch (err) {
     // ignore
   }
 
-  return shops;
+  const seenIds = new Set<string>();
+  const seenPhones = new Set<string>();
+  const uniqueShops: MechanicView[] = [];
+  for (const s of shops) {
+    const cleanPhone = (s.phone || "").replace(/\D/g, "").slice(-10);
+    if (seenIds.has(s.id)) continue;
+    if (cleanPhone && seenPhones.has(cleanPhone)) continue;
+    seenIds.add(s.id);
+    if (cleanPhone) seenPhones.add(cleanPhone);
+    uniqueShops.push(s);
+  }
+  return uniqueShops;
 }

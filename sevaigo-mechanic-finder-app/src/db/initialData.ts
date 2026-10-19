@@ -97,54 +97,6 @@ export const INITIAL_MECHANICS = [
     "is_online": true
   },
   {
-    "id": "744ed467-2811-4c21-bac5-25856d86b4de",
-    "slug": "ajju-bike-mechanic-shop-764815",
-    "owner_user_id": "5f448acd-b28a-4510-a6e3-a8ab1909630d",
-    "shop_name": "ajju bike mechanic shop",
-    "owner_name": "ajmal hussain u",
-    "owner_photo": "/images/owner-1.jpg",
-    "phone": "8667084522",
-    "address": "gobichettipalayam,nallagoundanpalayam,",
-    "city": "Chennai",
-    "pincode": "",
-    "shop_phone": "8667084522",
-    "latitude": 13.0597,
-    "longitude": 80.2514,
-    "vehicle_types": [
-      "4w",
-      "2w"
-    ],
-    "specializations": [
-      "Engine repair",
-      "AC repair"
-    ],
-    "working_days": [
-      "Mon",
-      "Tue",
-      "Wed",
-      "Thu",
-      "Fri",
-      "Sat"
-    ],
-    "open_time": "08:00",
-    "close_time": "21:00",
-    "rating": 0,
-    "review_count": 0,
-    "photos": [
-      "/images/workshop-1.jpg"
-    ],
-    "is_verified": true,
-    "approval_status": "approved",
-    "availability_status": "free",
-    "price_min": 300,
-    "price_max": 2500,
-    "years_experience": 5,
-    "created_at": "2026-10-14T13:38:59.931Z",
-    "business_doc": null,
-    "spare_parts": null,
-    "is_online": true
-  },
-  {
     "id": "3d6dea57-793b-4102-b25b-c430315dd350",
     "slug": "ajju-motors-9536a1",
     "owner_user_id": "a4d97f9c-30eb-472b-a92a-4d8c1e031e18",

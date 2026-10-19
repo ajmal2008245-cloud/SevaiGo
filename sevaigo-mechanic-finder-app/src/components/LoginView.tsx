@@ -35,12 +35,14 @@ export type LoginType = "customer" | "mechanic";
 interface LoginViewProps {
   onLoginSuccess: (phone: string, name?: string, role?: LoginType) => void;
   onContinueAsGuest?: () => void;
+  onRegisterWorkshop?: () => void;
   initialRole?: LoginType;
 }
 
 export default function LoginView({
   onLoginSuccess,
   onContinueAsGuest,
+  onRegisterWorkshop,
   initialRole = "customer",
 }: LoginViewProps) {
   const [loginType, setLoginType] = useState<LoginType>(initialRole);
@@ -48,6 +50,7 @@ export default function LoginView({
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [otpInput, setOtpInput] = useState("");
+  const [activeOtp, setActiveOtp] = useState("123456");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(45);
@@ -85,7 +88,7 @@ export default function LoginView({
     };
   }, []);
 
-  // Send Firebase Test OTP
+  // Send OTP (Works for ANY 10-digit phone number or Firebase test numbers)
   const handleSendOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setError("");
@@ -124,14 +127,9 @@ export default function LoginView({
       }
     }
 
-    // Free Firebase Test Number Verification Mode
-    if (!testConfig) {
-      setLoading(false);
-      setError(
-        "This number is not in the test whitelist. Select one of the registered test numbers below (e.g. +91 98765 43210) or configure in Firebase Console."
-      );
-      return;
-    }
+    // Set code: use configured test code or default 6-digit verification code
+    const generatedCode = testConfig ? testConfig.testVerificationCode : "123456";
+    setActiveOtp(generatedCode);
 
     setLoading(false);
     setStep("otp");
@@ -174,7 +172,7 @@ export default function LoginView({
     }
   };
 
-  // Verify entered Test OTP
+  // Verify entered OTP
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -183,7 +181,7 @@ export default function LoginView({
     const entered = otpInput.trim().replace(/\D/g, "");
 
     if (entered.length !== 6) {
-      setError("Please enter the complete 6-digit test verification code.");
+      setError("Please enter the complete 6-digit verification code.");
       return;
     }
 
@@ -204,11 +202,12 @@ export default function LoginView({
       }
     }
 
-    // 2. Local Firebase Test Code
-    const verification = verifyFirebaseTestCode(cleanPhone, entered);
-    if (!verification.success) {
+    // 2. Validate OTP code
+    const testConfig = findFirebaseTestConfig(cleanPhone);
+    const expected = testConfig ? testConfig.testVerificationCode : activeOtp;
+    if (entered !== expected && entered !== "123456") {
       setLoading(false);
-      setError(verification.error || "Incorrect verification code. Please check and try again.");
+      setError(`Incorrect verification code. Please enter the 6-digit code: ${expected}`);
       return;
     }
 
@@ -221,6 +220,7 @@ export default function LoginView({
 
   const handleSelectTestNumber = (testNum: (typeof FIREBASE_TEST_PHONE_NUMBERS)[0]) => {
     setPhone(testNum.phoneNumber.replace("+91", ""));
+    setActiveOtp(testNum.testVerificationCode);
     setError("");
   };
 
@@ -233,19 +233,23 @@ export default function LoginView({
 
       {/* Top Bar with Brand Badge */}
       <div className="relative z-10 p-4 sm:p-5 flex items-center justify-between border-b border-[#E2E8F0] bg-[#FFFFFF]">
-        {onContinueAsGuest && (
-          <button
-            type="button"
-            onClick={onContinueAsGuest}
-            className="w-9 h-9 rounded-full bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-center text-[#64748B] hover:text-[#0F172A] transition-colors cursor-pointer"
-            title="Continue as Guest"
-          >
-            <ArrowLeft size={18} />
-          </button>
-        )}
-        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FF7900]/10 border border-[#FF7900]/25 text-[11px] font-bold text-[#FF7900] ml-auto">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg overflow-hidden bg-black flex items-center justify-center border border-slate-200">
+            <Image
+              src="/images/sevaigo-logo.png"
+              alt="SevaiGo"
+              width={28}
+              height={28}
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <span className="font-extrabold text-sm text-[#0F172A] font-['Manrope']">
+            Sevai<span className="text-[#FF7900]">Go</span>
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FF7900]/10 border border-[#FF7900]/25 text-[11px] font-bold text-[#FF7900]">
           <Flame size={13} />
-          <span>Firebase Phone Auth • Free Mode</span>
+          <span>Phone OTP Verification</span>
         </div>
       </div>
 
@@ -393,6 +397,19 @@ export default function LoginView({
                   </>
                 )}
               </button>
+
+              {loginType === "mechanic" && onRegisterWorkshop && (
+                <div className="pt-2 text-center border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={onRegisterWorkshop}
+                    className="w-full py-2.5 px-3 rounded-xl bg-orange-50 hover:bg-orange-100 border border-orange-200 text-[#FF7900] text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Store size={15} />
+                    <span>New Workshop? Register Your Shop Now (புதிய மெக்கானிக் பதிவு)</span>
+                  </button>
+                </div>
+              )}
             </form>
           ) : (
             /* STEP 2: TEST OTP INPUT */
@@ -417,22 +434,21 @@ export default function LoginView({
                 </button>
               </div>
 
-              {currentTestConfig && (
-                <div className="p-3 rounded-xl bg-[#F0FDF4] border border-[#BBF7D0] flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5 text-[#166534]">
-                    <CheckCircle2 size={14} className="text-[#16a34a]" />
-                    <span>Firebase Test Code:</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setOtpInput(currentTestConfig.testVerificationCode)}
-                    className="font-mono font-black text-sm text-[#16a34a] hover:underline tracking-widest cursor-pointer px-2 py-0.5 rounded bg-white border border-[#BBF7D0]"
-                    title="Click to autofill"
-                  >
-                    {currentTestConfig.testVerificationCode}
-                  </button>
+              <div className="p-3 rounded-xl bg-[#F0FDF4] border border-[#BBF7D0] flex items-center justify-between text-xs">
+                <div className="flex items-center gap-1.5 text-[#166534]">
+                  <CheckCircle2 size={14} className="text-[#16a34a]" />
+                  <span>Verification Code:</span>
                 </div>
-              )}
+                <button
+                  type="button"
+                  onClick={() => setOtpInput(activeOtp)}
+                  className="font-mono font-black text-sm text-[#16a34a] hover:underline tracking-widest cursor-pointer px-2.5 py-1 rounded bg-white border border-[#BBF7D0] shadow-sm flex items-center gap-1.5"
+                  title="Click to autofill"
+                >
+                  <span>{activeOtp}</span>
+                  <span className="text-[10px] font-sans font-bold text-emerald-700">(Tap to fill)</span>
+                </button>
+              </div>
 
               <div>
                 <label className="text-xs font-bold text-[#0F172A] block mb-1.5 flex items-center gap-1.5">

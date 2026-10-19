@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft, ArrowRight, Bike, CarFront, Check, CheckCircle2, Clock3,
-  Compass, Info, LocateFixed, LogOut, MapPin, Navigation, Phone, ShieldAlert,
-  ShieldCheck, Sparkles, Store, Truck, UserRound, Wrench, X, AlertCircle, Edit3
+  ArrowLeft, ArrowRight, Bike, Camera, CarFront, Check, CheckCircle2, Clock3,
+  Compass, Info, LocateFixed, LogOut, MapPin, Navigation, Phone, Search, ShieldAlert,
+  ShieldCheck, Sparkles, Store, Truck, Upload, UserRound, Wrench, X, AlertCircle, Edit3
 } from "lucide-react";
 import MechanicMap, { type MapLocation } from "@/components/MechanicMap";
 import type { PublicUser } from "@/lib/auth";
@@ -89,6 +89,11 @@ export default function RegisterShopFlow({
   const [password, setPassword] = useState("");
   const [shopName, setShopName] = useState("");
   const [shopPhone, setShopPhone] = useState("");
+  const [whatsappNumber, setWhatsappNumber] = useState(initialUser?.phone || "");
+  const [additionalPhone, setAdditionalPhone] = useState("");
+  const [locationQuery, setLocationQuery] = useState("");
+  const [isSearchingLocation, setIsSearchingLocation] = useState(false);
+  const [shopPhotoPreview, setShopPhotoPreview] = useState("");
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("Chennai");
   const [pincode, setPincode] = useState("");
@@ -104,8 +109,10 @@ export default function RegisterShopFlow({
   const [businessDoc, setBusinessDoc] = useState("");
   const [spareParts, setSpareParts] = useState<string[]>(["Tubes (Front/Rear)", "Spark Plugs", "Engine Oil (Motul/Castrol)", "Brake Pads & Shoes"]);
   const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
+  const [activeEmergencyAlert, setActiveEmergencyAlert] = useState<any | null>(null);
   const [sharingLocationId, setSharingLocationId] = useState<string | null>(null);
   const watchIdRef = useRef<number | null>(null);
+  const prevIncomingCountRef = useRef<number>(0);
 
   // Map Picker State
   const [pickedCoords, setPickedCoords] = useState<{ latitude: number; longitude: number }>({
@@ -118,6 +125,10 @@ export default function RegisterShopFlow({
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [syncingMapLocation, setSyncingMapLocation] = useState(false);
+  const [syncSuccessMsg, setSyncSuccessMsg] = useState("");
+  const editAddressDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const regAddressDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // Dashboard Edit State
   const [editingShop, setEditingShop] = useState(false);
@@ -152,16 +163,22 @@ export default function RegisterShopFlow({
           if (json?.success && json.shop) {
             const matched = json.shop;
             const servicesList = Array.isArray(matched.services) ? matched.services : [];
+            const shopCity = matched.city || "";
+            const shopPincode = matched.pincode || "";
+            const shopLat = Number(matched.lat ?? matched.latitude ?? 11.4550);
+            const shopLng = Number(matched.lng ?? matched.longitude ?? 77.4240);
+
             setExistingShop({
               id: matched.id,
               shopName: matched.shop_name || "Workshop",
               ownerName: matched.owner_name || "Mechanic",
               phone: matched.phone || "",
               shopPhone: matched.phone || "",
-              address: matched.address || "Chennai",
-              city: "Chennai",
-              latitude: matched.lat || DEMO_LOCATION.latitude,
-              longitude: matched.lng || DEMO_LOCATION.longitude,
+              address: matched.address || "",
+              city: shopCity,
+              pincode: shopPincode,
+              latitude: shopLat,
+              longitude: shopLng,
               vehicleTypes: ["2w", "4w"],
               specializations: servicesList,
               openTime: "08:00",
@@ -180,8 +197,8 @@ export default function RegisterShopFlow({
               phone: matched.phone || "",
               shopPhone: matched.phone || "",
               address: matched.address || "",
-              city: "Chennai",
-              pincode: "",
+              city: shopCity,
+              pincode: shopPincode,
               openTime: "08:00",
               closeTime: "21:00",
               priceMin: "300",
@@ -189,8 +206,8 @@ export default function RegisterShopFlow({
               availabilityStatus: "free",
               specializations: servicesList,
               workingDays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
-              latitude: matched.lat || DEMO_LOCATION.latitude,
-              longitude: matched.lng || DEMO_LOCATION.longitude,
+              latitude: shopLat,
+              longitude: shopLng,
             });
             setLoadingShop(false);
             return;
@@ -202,7 +219,32 @@ export default function RegisterShopFlow({
       if (res.ok) {
         const data = await res.json().catch(() => null);
         if (data?.shop) {
-          setExistingShop(data.shop);
+          const s = data.shop;
+          const sLat = Number(s.latitude || 11.4550);
+          const sLng = Number(s.longitude || 77.4240);
+          setExistingShop({
+            ...s,
+            latitude: sLat,
+            longitude: sLng,
+          });
+          setEditDraft({
+            shopName: s.shopName || "",
+            ownerName: s.ownerName || "",
+            phone: s.phone || "",
+            shopPhone: s.shopPhone || s.phone || "",
+            address: s.address || "",
+            city: s.city || "",
+            pincode: s.pincode || "",
+            openTime: s.openTime || "08:00",
+            closeTime: s.closeTime || "21:00",
+            priceMin: String(s.priceMin || "300"),
+            priceMax: String(s.priceMax || "2500"),
+            availabilityStatus: s.availabilityStatus || "free",
+            specializations: s.specializations || [],
+            workingDays: s.workingDays || ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+            latitude: sLat,
+            longitude: sLng,
+          });
         }
       }
     } catch {
@@ -242,6 +284,247 @@ export default function RegisterShopFlow({
       },
       { timeout: 10000, enableHighAccuracy: true }
     );
+  }
+
+  // Play audio alert chime when new customer breakdown request arrives
+  function playAlertChime() {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.4);
+    } catch {
+      // AudioContext muted/unsupported
+    }
+  }
+
+  // Auto-search locality & landmark to pinpoint shop on map
+  async function handleSearchLocation(queryOverride?: string) {
+    const q = (queryOverride ?? locationQuery).trim();
+    if (!q) return;
+    setIsSearchingLocation(true);
+    setErrorMessage("");
+    try {
+      const searchQuery = q.toLowerCase().includes("tamil nadu") || q.toLowerCase().includes("india")
+        ? q
+        : `${q}, Tamil Nadu, India`;
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1`,
+        { headers: { "User-Agent": "SevaiGo-Partner" } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const first = data[0];
+          const newLat = Number(Number(first.lat).toFixed(6));
+          const newLng = Number(Number(first.lon).toFixed(6));
+          setPickedCoords({ latitude: newLat, longitude: newLng });
+          if (!address) {
+            setAddress(first.display_name?.split(",").slice(0, 3).join(",") || q);
+          }
+          const parts = first.display_name?.split(",") || [];
+          if (parts.length > 2 && !city) {
+            setCity(parts[parts.length - 3]?.trim() || "Chennai");
+          }
+          setSuccessMessage(`📍 Map updated to: ${first.display_name?.split(",").slice(0, 2).join(",")}`);
+        } else {
+          setErrorMessage(`Could not find "${q}" on the map. Please click on the map directly or try another landmark.`);
+        }
+      }
+    } catch {
+      setErrorMessage("Could not search location. Please click directly on the map.");
+    } finally {
+      setIsSearchingLocation(false);
+    }
+  }
+
+  // Comprehensive Address Geocoding with Fallback Cascade
+  const geocodeAddressToCoords = async (
+    street: string,
+    cityStr: string,
+    pinStr: string
+  ): Promise<{ lat: number; lng: number; label: string } | null> => {
+    const cleanPin = (pinStr || "").replace(/\D/g, "");
+    const cleanCity = cityStr?.trim() || "";
+    const cleanStreet = street?.trim() || "";
+
+    const queries: string[] = [];
+    if (cleanStreet && cleanCity && cleanPin) {
+      queries.push(`${cleanStreet}, ${cleanCity}, ${cleanPin}, Tamil Nadu, India`);
+      queries.push(`${cleanStreet}, ${cleanCity}, India`);
+    }
+    if (cleanStreet) {
+      const parts = cleanStreet.split(",").map((p) => p.trim()).filter(Boolean);
+      for (const part of parts) {
+        if (cleanCity) queries.push(`${part}, ${cleanCity}, Tamil Nadu, India`);
+        queries.push(`${part}, Tamil Nadu, India`);
+      }
+    }
+    if (cleanPin && cleanPin.length === 6) {
+      queries.push(`${cleanPin}, India`);
+      queries.push(`${cleanPin}, Tamil Nadu, India`);
+    }
+    if (cleanCity) {
+      queries.push(`${cleanCity}, Tamil Nadu, India`);
+    }
+
+    for (const q of queries) {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`,
+          { headers: { "User-Agent": "SevaiGo-App" } }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            const item = data[0];
+            const lat = Number(Number(item.lat).toFixed(6));
+            const lng = Number(Number(item.lon).toFixed(6));
+            if (Number.isFinite(lat) && Number.isFinite(lng)) {
+              return { lat, lng, label: item.display_name || q };
+            }
+          }
+        }
+      } catch {}
+    }
+    return null;
+  };
+
+  // Reverse Geocoding when Pin is clicked or dragged on Map
+  const reverseGeocodeCoords = async (lat: number, lng: number) => {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=17`,
+        { headers: { "User-Agent": "SevaiGo-App" } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const addr = data.address || {};
+        const road = addr.road || addr.street || "";
+        const suburb = addr.suburb || addr.neighbourhood || addr.village || addr.hamlet || "";
+        const town = addr.city || addr.town || addr.county || addr.district || "";
+        const postcode = addr.postcode || "";
+
+        const fullStreet = [road, suburb].filter(Boolean).join(", ");
+        return {
+          street: fullStreet || data.display_name?.split(",").slice(0, 2).join(", ") || "",
+          city: town || "",
+          pincode: postcode || "",
+        };
+      }
+    } catch {}
+    return null;
+  };
+
+  const handleSyncEditAddressToMap = async (customStreet?: string, customCity?: string, customPin?: string) => {
+    const st = customStreet ?? editDraft.address;
+    const ct = customCity ?? editDraft.city;
+    const pin = customPin ?? editDraft.pincode;
+    if (!st && !ct && !pin) return;
+    setSyncingMapLocation(true);
+    setSyncSuccessMsg("");
+    const res = await geocodeAddressToCoords(st, ct, pin);
+    if (res) {
+      setEditDraft((prev) => ({
+        ...prev,
+        latitude: res.lat,
+        longitude: res.lng,
+      }));
+      setSyncSuccessMsg(`📍 Map pin moved to: ${res.label.split(",").slice(0, 2).join(",")}`);
+    } else {
+      setSyncSuccessMsg(`Could not find "${st || ct}". Try selecting nearby town.`);
+    }
+    setSyncingMapLocation(false);
+  };
+
+  const handleEditAddressFieldChange = (field: "address" | "city" | "pincode", val: string) => {
+    const updated = { ...editDraft, [field]: val };
+    setEditDraft(updated);
+    if (editAddressDebounceRef.current) clearTimeout(editAddressDebounceRef.current);
+    editAddressDebounceRef.current = setTimeout(() => {
+      handleSyncEditAddressToMap(updated.address, updated.city, updated.pincode);
+    }, 700);
+  };
+
+  const handlePickEditLocation = async (coords: { latitude: number; longitude: number }) => {
+    setEditDraft((prev) => ({ ...prev, latitude: coords.latitude, longitude: coords.longitude }));
+    const rev = await reverseGeocodeCoords(coords.latitude, coords.longitude);
+    if (rev) {
+      setEditDraft((prev) => ({
+        ...prev,
+        address: rev.street || prev.address,
+        city: rev.city || prev.city,
+        pincode: rev.pincode || prev.pincode,
+      }));
+      setSyncSuccessMsg(`📍 Address updated from map: ${rev.street || rev.city}`);
+    }
+  };
+
+  const handleSyncRegisterAddressToMap = async (customStreet?: string, customCity?: string, customPin?: string) => {
+    const st = customStreet ?? address;
+    const ct = customCity ?? city;
+    const pin = customPin ?? pincode;
+    if (!st && !ct && !pin) return;
+    setSyncingMapLocation(true);
+    setSyncSuccessMsg("");
+    const res = await geocodeAddressToCoords(st, ct, pin);
+    if (res) {
+      setPickedCoords({ latitude: res.lat, longitude: res.lng });
+      setSyncSuccessMsg(`📍 Map pin moved to: ${res.label.split(",").slice(0, 2).join(",")}`);
+    }
+    setSyncingMapLocation(false);
+  };
+
+  const handleRegAddressFieldChange = (field: "address" | "city" | "pincode", val: string) => {
+    let nextAddr = address;
+    let nextCity = city;
+    let nextPin = pincode;
+    if (field === "address") { setAddress(val); nextAddr = val; }
+    if (field === "city") { setCity(val); nextCity = val; }
+    if (field === "pincode") { setPincode(val); nextPin = val; }
+
+    if (regAddressDebounceRef.current) clearTimeout(regAddressDebounceRef.current);
+    regAddressDebounceRef.current = setTimeout(() => {
+      handleSyncRegisterAddressToMap(nextAddr, nextCity, nextPin);
+    }, 700);
+  };
+
+  const handlePickRegisterLocation = async (coords: { latitude: number; longitude: number }) => {
+    setPickedCoords(coords);
+    const rev = await reverseGeocodeCoords(coords.latitude, coords.longitude);
+    if (rev) {
+      if (rev.street) setAddress(rev.street);
+      if (rev.city) setCity(rev.city);
+      if (rev.pincode) setPincode(rev.pincode);
+      setSyncSuccessMsg(`📍 Address updated from map: ${rev.street || rev.city}`);
+    }
+  };
+
+  // Handle Shop Front Photo Upload
+  function handleShopPhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      setErrorMessage("Shop photo is too large (max 8MB).");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      setShopPhotoPreview(dataUrl);
+      setWorkshopPhotoUrl(dataUrl);
+    };
+    reader.readAsDataURL(file);
   }
 
   function toggleVehicleType(type: string) {
@@ -304,10 +587,12 @@ export default function RegisterShopFlow({
       const payload = {
         ownerName: ownerName.trim(),
         phone: phone.trim(),
+        whatsappNumber: whatsappNumber.trim() || phone.trim(),
+        additionalPhone: additionalPhone.trim() || shopPhone.trim() || undefined,
         email: email.trim() || undefined,
         password: password || undefined,
         shopName: shopName.trim(),
-        shopPhone: shopPhone.trim() || phone.trim(),
+        shopPhone: shopPhone.trim() || additionalPhone.trim() || phone.trim(),
         address: address.trim(),
         city: city.trim() || "Chennai",
         pincode: pincode.trim(),
@@ -321,7 +606,7 @@ export default function RegisterShopFlow({
         priceMin: Number(priceMin) || 300,
         priceMax: Number(priceMax) || 2500,
         yearsExperience: Number(yearsExperience) || 5,
-        photos: workshopPhotoUrl.trim() ? [workshopPhotoUrl.trim()] : ["/images/workshop-1.jpg"],
+        photos: (shopPhotoPreview.trim() || workshopPhotoUrl.trim()) ? [shopPhotoPreview.trim() || workshopPhotoUrl.trim()] : ["/images/workshop-1.jpg"],
         spareParts,
         businessDoc: businessDoc.trim() || undefined,
       };
@@ -443,24 +728,70 @@ export default function RegisterShopFlow({
     }
   }
 
-  // Fetch incoming live rescue requests for this workshop
+  // Fetch incoming live rescue requests for this workshop (every 3 seconds for instant reach)
   const fetchIncomingRequests = useCallback(async () => {
     if (!existingShop) return;
     try {
-      const res = await fetch("/api/breakdowns?mode=incoming");
+      const shopParam = existingShop.id ? `&shopId=${encodeURIComponent(existingShop.id)}` : "";
+      const phoneParam = existingShop.phone || phone ? `&phone=${encodeURIComponent(existingShop.phone || phone)}` : "";
+      const res = await fetch(`/api/breakdowns?mode=incoming${shopParam}${phoneParam}`);
       if (res.ok) {
         const data = await res.json();
-        setIncomingRequests(data.breakdowns || []);
+        const list = data.breakdowns || [];
+        if (list.length > prevIncomingCountRef.current && list.length > 0) {
+          playAlertChime();
+          const newest = list[0];
+          if (newest && newest.status === "pending") {
+            setActiveEmergencyAlert(newest);
+          }
+        }
+        prevIncomingCountRef.current = list.length;
+        setIncomingRequests(list);
       }
     } catch {
       // ignore
     }
-  }, [existingShop]);
+  }, [existingShop, phone]);
+
+  // Zero-latency instant alert listener via BroadcastChannel and storage events
+  useEffect(() => {
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel("sevaigo_breakdown_alerts");
+      bc.onmessage = (event) => {
+        const data = event.data;
+        if (data && (data.type === "INCOMING_BREAKDOWN" || data.type === "NEW_BREAKDOWN_ALERT")) {
+          playAlertChime();
+          setActiveEmergencyAlert(data);
+          fetchIncomingRequests();
+        }
+      };
+    } catch {}
+
+    const handleStorageAlert = (e: StorageEvent) => {
+      if (e.key === "sevaigo_incoming_alert" && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          playAlertChime();
+          setActiveEmergencyAlert(parsed);
+          fetchIncomingRequests();
+        } catch {}
+      }
+    };
+    window.addEventListener("storage", handleStorageAlert);
+
+    return () => {
+      try {
+        bc?.close();
+      } catch {}
+      window.removeEventListener("storage", handleStorageAlert);
+    };
+  }, [fetchIncomingRequests]);
 
   useEffect(() => {
     if (existingShop) {
       fetchIncomingRequests();
-      const interval = setInterval(fetchIncomingRequests, 10000);
+      const interval = setInterval(fetchIncomingRequests, 3000);
       return () => clearInterval(interval);
     }
   }, [existingShop, fetchIncomingRequests]);
@@ -612,6 +943,195 @@ export default function RegisterShopFlow({
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "var(--bg)", color: "var(--text)" }}>
+      {/* Sudden Reach: Emergency Breakdown Alert Modal */}
+      {activeEmergencyAlert && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 9999,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "16px",
+          backgroundColor: "rgba(0, 0, 0, 0.8)",
+          backdropFilter: "blur(6px)",
+        }}>
+          <div style={{
+            width: "100%",
+            maxWidth: "480px",
+            borderRadius: "24px",
+            backgroundColor: "#FFFFFF",
+            border: "3px solid #dc2626",
+            padding: "24px",
+            boxShadow: "0 25px 50px -12px rgba(220, 38, 38, 0.35)",
+            color: "#0F172A",
+            animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+          }}>
+            {/* Alert Header */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: "14px", borderBottom: "1px solid #fee2e2" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ width: "12px", height: "12px", borderRadius: "50%", backgroundColor: "#dc2626", display: "inline-block" }} />
+                <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: "900", color: "#dc2626", fontFamily: "'Manrope', sans-serif" }}>
+                  🚨 INCOMING BREAKDOWN CALL / REQUEST!
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveEmergencyAlert(null)}
+                style={{ background: "none", border: 0, cursor: "pointer", color: "#94a3b8", padding: "4px" }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Alert Details Card */}
+            <div style={{ margin: "16px 0", padding: "16px", borderRadius: "16px", backgroundColor: "#fef2f2", border: "1px solid #fecaca", display: "flex", flexDirection: "column", gap: "10px", fontSize: "0.85rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ color: "#64748b", fontWeight: "700" }}>Customer Name:</span>
+                <strong style={{ fontSize: "0.95rem", color: "#0f172a" }}>{activeEmergencyAlert.userName || "Rider in Need"}</strong>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ color: "#64748b", fontWeight: "700" }}>Phone Number:</span>
+                <a href={`tel:${activeEmergencyAlert.userPhone}`} style={{ fontSize: "0.95rem", fontWeight: "800", color: "#2563eb", textDecoration: "underline", fontFamily: "monospace" }}>
+                  {activeEmergencyAlert.userPhone}
+                </a>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ color: "#64748b", fontWeight: "700" }}>Vehicle Type:</span>
+                <span style={{ fontWeight: "800", color: "#0f172a" }}>{activeEmergencyAlert.vehicleType?.toUpperCase() || "2W"}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ color: "#64748b", fontWeight: "700" }}>Breakdown Issue:</span>
+                <span style={{ fontWeight: "800", color: "#b91c1c", backgroundColor: "#fee2e2", padding: "3px 8px", borderRadius: "6px" }}>
+                  {activeEmergencyAlert.issue}
+                </span>
+              </div>
+              {activeEmergencyAlert.address && (
+                <div>
+                  <span style={{ color: "#64748b", fontWeight: "700", display: "block", marginBottom: "2px" }}>Breakdown Location:</span>
+                  <span style={{ color: "#1e293b", fontWeight: "600" }}>{activeEmergencyAlert.address}</span>
+                </div>
+              )}
+              {activeEmergencyAlert.spareParts && activeEmergencyAlert.spareParts.length > 0 && (
+                <div>
+                  <span style={{ color: "#64748b", fontWeight: "700", display: "block", marginBottom: "4px" }}>Requested Spare Parts:</span>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                    {activeEmergencyAlert.spareParts.map((sp: string) => (
+                      <span key={sp} style={{ fontSize: "0.75rem", padding: "2px 6px", borderRadius: "4px", backgroundColor: "#fff", border: "1px solid #fecaca", color: "#dc2626", fontWeight: "700" }}>
+                        {sp}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {activeEmergencyAlert.photoUrl && (
+                <div style={{ marginTop: "4px" }}>
+                  <span style={{ color: "#64748b", fontWeight: "700", display: "block", marginBottom: "4px" }}>Breakdown Photo:</span>
+                  <img src={activeEmergencyAlert.photoUrl} alt="Breakdown Attachment" style={{ width: "100%", height: "120px", objectFit: "cover", borderRadius: "10px", border: "1px solid #fecaca" }} />
+                </div>
+              )}
+            </div>
+
+            {/* Emergency Action Buttons */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
+              <a
+                href={`tel:${activeEmergencyAlert.userPhone}`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  padding: "12px",
+                  borderRadius: "12px",
+                  backgroundColor: "#2563eb",
+                  color: "#ffffff",
+                  fontSize: "0.85rem",
+                  fontWeight: "800",
+                  textDecoration: "none",
+                  textAlign: "center",
+                  boxShadow: "0 4px 6px -1px rgba(37, 99, 235, 0.2)",
+                }}
+              >
+                <Phone size={16} /> <span>Call Customer</span>
+              </a>
+              <a
+                href={`https://wa.me/91${(activeEmergencyAlert.userPhone || "").replace(/\D/g, "").slice(-10)}?text=${encodeURIComponent(
+                  `Hello ${activeEmergencyAlert.userName || "Customer"}, I am from ${existingShop?.shopName || "SevaiGo Partner Garage"}. I received your emergency breakdown request (${activeEmergencyAlert.issue}). We are dispatching a mechanic right away!`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  padding: "12px",
+                  borderRadius: "12px",
+                  backgroundColor: "#16a34a",
+                  color: "#ffffff",
+                  fontSize: "0.85rem",
+                  fontWeight: "800",
+                  textDecoration: "none",
+                  textAlign: "center",
+                  boxShadow: "0 4px 6px -1px rgba(22, 163, 74, 0.2)",
+                }}
+              >
+                <span>💬 WhatsApp</span>
+              </a>
+            </div>
+
+            {activeEmergencyAlert.latitude && activeEmergencyAlert.longitude && (
+              <a
+                href={`https://www.google.com/maps/dir/?api=1&destination=${activeEmergencyAlert.latitude},${activeEmergencyAlert.longitude}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  width: "100%",
+                  padding: "11px",
+                  borderRadius: "12px",
+                  backgroundColor: "#0F172A",
+                  color: "#ffffff",
+                  fontSize: "0.82rem",
+                  fontWeight: "800",
+                  textDecoration: "none",
+                  marginBottom: "10px",
+                }}
+              >
+                <Navigation size={15} /> <span>Navigate on Google Maps</span>
+              </a>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                if (activeEmergencyAlert.id) handleUpdateRequestStatus(activeEmergencyAlert.id, "accepted");
+                setActiveEmergencyAlert(null);
+              }}
+              style={{
+                width: "100%",
+                padding: "13px",
+                borderRadius: "12px",
+                backgroundColor: "#FF7900",
+                color: "#ffffff",
+                border: 0,
+                fontSize: "0.88rem",
+                fontWeight: "900",
+                cursor: "pointer",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                boxShadow: "0 4px 14px rgba(255, 121, 0, 0.35)",
+              }}
+            >
+              ✅ Accept Request & Dispatch
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top Header */}
       <header
         style={{
@@ -1103,23 +1623,46 @@ export default function RegisterShopFlow({
 
                       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
                         {req.userPhone && (
-                          <a
-                            href={`tel:${req.userPhone}`}
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "4px",
-                              padding: "7px 14px",
-                              borderRadius: "8px",
-                              backgroundColor: "#2563eb",
-                              color: "#fff",
-                              fontSize: "0.82rem",
-                              fontWeight: "700",
-                              textDecoration: "none",
-                            }}
-                          >
-                            <Phone size={14} /> Call
-                          </a>
+                          <>
+                            <a
+                              href={`tel:${req.userPhone}`}
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                padding: "7px 14px",
+                                borderRadius: "8px",
+                                backgroundColor: "#2563eb",
+                                color: "#fff",
+                                fontSize: "0.82rem",
+                                fontWeight: "700",
+                                textDecoration: "none",
+                              }}
+                            >
+                              <Phone size={14} /> Call
+                            </a>
+                            <a
+                              href={`https://wa.me/91${req.userPhone.replace(/\D/g, "").slice(-10)}?text=${encodeURIComponent(
+                                `Hello ${req.userName || "Customer"}, I am from ${existingShop?.shopName || "SevaiGo Partner"}. I received your breakdown request (${req.issue}). I am on my way.`
+                              )}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                padding: "7px 14px",
+                                borderRadius: "8px",
+                                backgroundColor: "#16a34a",
+                                color: "#fff",
+                                fontSize: "0.82rem",
+                                fontWeight: "700",
+                                textDecoration: "none",
+                              }}
+                            >
+                              💬 WhatsApp
+                            </a>
+                          </>
                         )}
 
                         {req.latitude && req.longitude && (
@@ -1490,14 +2033,15 @@ export default function RegisterShopFlow({
                     </label>
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: "16px", marginBottom: "8px" }}>
                     <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.82rem", fontWeight: "700" }}>
                       Full Street Address
                       <input
                         type="text"
                         required
                         value={editDraft.address}
-                        onChange={(e) => setEditDraft({ ...editDraft, address: e.target.value })}
+                        onChange={(e) => handleEditAddressFieldChange("address", e.target.value)}
+                        onBlur={() => handleSyncEditAddressToMap()}
                         style={{ height: "40px", borderRadius: "8px", border: "1px solid var(--border)", padding: "0 12px", backgroundColor: "var(--bg)" }}
                       />
                     </label>
@@ -1507,7 +2051,8 @@ export default function RegisterShopFlow({
                         type="text"
                         required
                         value={editDraft.city}
-                        onChange={(e) => setEditDraft({ ...editDraft, city: e.target.value })}
+                        onChange={(e) => handleEditAddressFieldChange("city", e.target.value)}
+                        onBlur={() => handleSyncEditAddressToMap()}
                         style={{ height: "40px", borderRadius: "8px", border: "1px solid var(--border)", padding: "0 12px", backgroundColor: "var(--bg)" }}
                       />
                     </label>
@@ -1517,10 +2062,41 @@ export default function RegisterShopFlow({
                         type="text"
                         required
                         value={editDraft.pincode}
-                        onChange={(e) => setEditDraft({ ...editDraft, pincode: e.target.value })}
+                        onChange={(e) => handleEditAddressFieldChange("pincode", e.target.value)}
+                        onBlur={() => handleSyncEditAddressToMap()}
                         style={{ height: "40px", borderRadius: "8px", border: "1px solid var(--border)", padding: "0 12px", backgroundColor: "var(--bg)" }}
                       />
                     </label>
+                  </div>
+
+                  {/* Address to Map Sync Trigger & Status */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
+                    <button
+                      type="button"
+                      onClick={() => handleSyncEditAddressToMap()}
+                      disabled={syncingMapLocation}
+                      style={{
+                        padding: "6px 14px",
+                        borderRadius: "8px",
+                        backgroundColor: "#FF7900",
+                        color: "#fff",
+                        border: 0,
+                        fontSize: "0.78rem",
+                        fontWeight: "700",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                      }}
+                    >
+                      <MapPin size={13} />
+                      {syncingMapLocation ? "Locating on Map..." : "📍 Auto-Move Map Pin to this Address"}
+                    </button>
+                    {syncSuccessMsg && (
+                      <span style={{ fontSize: "0.76rem", color: "#16a34a", fontWeight: "700" }}>
+                        {syncSuccessMsg}
+                      </span>
+                    )}
                   </div>
 
                   {/* Hours */}
@@ -1551,7 +2127,7 @@ export default function RegisterShopFlow({
                   <div style={{ marginBottom: "24px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
                       <span style={{ fontSize: "0.85rem", fontWeight: "700" }}>Update Pin on Live Map</span>
-                      <span style={{ fontSize: "0.75rem", color: "var(--muted-dark)" }}>Click map or drag marker</span>
+                      <span style={{ fontSize: "0.75rem", color: "var(--muted-dark)" }}>Click map or drag marker to update address</span>
                     </div>
                     <div style={{ height: "260px", borderRadius: "12px", overflow: "hidden" }}>
                       <MechanicMap
@@ -1563,7 +2139,7 @@ export default function RegisterShopFlow({
                         }}
                         pickerMode={true}
                         pickedLocation={{ latitude: editDraft.latitude, longitude: editDraft.longitude }}
-                        onPickLocation={(coords) => setEditDraft({ ...editDraft, ...coords })}
+                        onPickLocation={handlePickEditLocation}
                       />
                     </div>
                   </div>
@@ -1617,7 +2193,131 @@ export default function RegisterShopFlow({
               boxShadow: "var(--shadow)",
             }}
           >
-            {/* Step 1: Owner Details */}
+            {/* Step 0: First Shop Front Photo */}
+            <div
+              style={{
+                marginBottom: "32px",
+                padding: "24px",
+                borderRadius: "16px",
+                backgroundColor: "#fff8f3",
+                border: "2px dashed #f97316",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
+                <span
+                  style={{
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "50%",
+                    backgroundColor: "#FF7900",
+                    color: "#ffffff",
+                    display: "grid",
+                    placeItems: "center",
+                    fontWeight: "800",
+                    fontSize: "0.9rem",
+                  }}
+                >
+                  📸
+                </span>
+                <div>
+                  <h2 style={{ fontSize: "1.18rem", fontWeight: "800", margin: 0, color: "#0f172a" }}>
+                    First Shop Photo (Garage Front View) *
+                  </h2>
+                  <p style={{ margin: 0, fontSize: "0.8rem", color: "#64748b" }}>
+                    Attach an original photo of your workshop entrance so breakdown customers can easily recognize your garage.
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "18px", alignItems: "center" }}>
+                {shopPhotoPreview || workshopPhotoUrl ? (
+                  <div style={{ position: "relative", width: "170px", height: "115px", borderRadius: "12px", overflow: "hidden", border: "2px solid #FF7900", boxShadow: "0 4px 12px rgba(255,121,0,0.15)" }}>
+                    <img
+                      src={shopPhotoPreview || workshopPhotoUrl}
+                      alt="Shop Front"
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShopPhotoPreview("");
+                        setWorkshopPhotoUrl("");
+                      }}
+                      style={{
+                        position: "absolute",
+                        top: "6px",
+                        right: "6px",
+                        width: "24px",
+                        height: "24px",
+                        borderRadius: "50%",
+                        backgroundColor: "rgba(0,0,0,0.75)",
+                        color: "#ffffff",
+                        border: 0,
+                        display: "grid",
+                        placeItems: "center",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <label
+                    style={{
+                      width: "170px",
+                      height: "115px",
+                      borderRadius: "12px",
+                      border: "2px dashed #FF7900",
+                      backgroundColor: "rgba(255, 121, 0, 0.08)",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
+                      cursor: "pointer",
+                      color: "#c2410c",
+                      fontSize: "0.8rem",
+                      fontWeight: "800",
+                      transition: "background-color 0.2s",
+                    }}
+                  >
+                    <Camera size={26} className="text-[#FF7900]" />
+                    <span>Upload Shop Photo</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleShopPhotoUpload}
+                      style={{ display: "none" }}
+                    />
+                  </label>
+                )}
+
+                <div style={{ flex: 1, minWidth: "240px" }}>
+                  <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.82rem", fontWeight: "700" }}>
+                    <span>Or Workshop Image URL:</span>
+                    <input
+                      type="url"
+                      placeholder="https://images.example.com/shop-photo.jpg"
+                      value={workshopPhotoUrl}
+                      onChange={(e) => {
+                        setWorkshopPhotoUrl(e.target.value);
+                        if (!shopPhotoPreview) setShopPhotoPreview(e.target.value);
+                      }}
+                      style={{
+                        height: "44px",
+                        borderRadius: "10px",
+                        border: "1px solid var(--border)",
+                        padding: "0 14px",
+                        backgroundColor: "var(--bg)",
+                        fontSize: "0.85rem",
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Step 1: Shop & Mechanic Details */}
             <div style={{ marginBottom: "36px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "18px" }}>
                 <span
@@ -1635,12 +2335,30 @@ export default function RegisterShopFlow({
                 >
                   1
                 </span>
-                <h2 style={{ fontSize: "1.25rem", fontWeight: "800", margin: 0 }}>Mechanic & Workshop Credentials</h2>
+                <h2 style={{ fontSize: "1.25rem", fontWeight: "800", margin: 0 }}>Shop & Mechanic Details</h2>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
                 <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.84rem", fontWeight: "700" }}>
-                  Mechanic Full Name *
+                  Shop / Garage Name *
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Sri Balaji Motors & Garage"
+                    value={shopName}
+                    onChange={(e) => setShopName(e.target.value)}
+                    style={{
+                      height: "44px",
+                      borderRadius: "10px",
+                      border: "1px solid var(--border)",
+                      padding: "0 14px",
+                      backgroundColor: "var(--bg)",
+                    }}
+                  />
+                </label>
+
+                <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.84rem", fontWeight: "700" }}>
+                  Owner Full Name *
                   <input
                     type="text"
                     required
@@ -1658,13 +2376,16 @@ export default function RegisterShopFlow({
                 </label>
 
                 <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.84rem", fontWeight: "700" }}>
-                  Mobile Number (for OTP & Customer Calls) *
+                  Primary Phone Number (Customer Calls & Verification) *
                   <input
                     type="tel"
                     required
                     placeholder="+91 98765 43210"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      if (!whatsappNumber) setWhatsappNumber(e.target.value);
+                    }}
                     style={{
                       height: "44px",
                       borderRadius: "10px",
@@ -1675,17 +2396,41 @@ export default function RegisterShopFlow({
                   />
                   <span style={{ fontSize: "0.74rem", color: "var(--muted-dark)", display: "inline-flex", alignItems: "center", gap: "5px" }}>
                     <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "#16a34a" }} />
-                    Mobile Verification: Direct verified communication mode.
+                    Customers will call this number directly during bike breakdowns.
                   </span>
                 </label>
 
                 <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.84rem", fontWeight: "700" }}>
-                  Optional Business Verification (GST / Trade License)
+                  WhatsApp Number (for Instant Customer SOS Alerts) *
                   <input
-                    type="text"
-                    placeholder="e.g. GSTIN / TN-TRADE-2024 / ID"
-                    value={businessDoc}
-                    onChange={(e) => setBusinessDoc(e.target.value)}
+                    type="tel"
+                    required
+                    placeholder="+91 98765 43210"
+                    value={whatsappNumber}
+                    onChange={(e) => setWhatsappNumber(e.target.value)}
+                    style={{
+                      height: "44px",
+                      borderRadius: "10px",
+                      border: "1.5px solid #16a34a",
+                      padding: "0 14px",
+                      backgroundColor: "var(--bg)",
+                    }}
+                  />
+                  <span style={{ fontSize: "0.74rem", color: "#16a34a", fontWeight: "600" }}>
+                    💬 Customer SOS breakdown requests & GPS location will arrive directly to this WhatsApp.
+                  </span>
+                </label>
+
+                <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.84rem", fontWeight: "700" }}>
+                  Additional / Landline Phone Number <small style={{ color: "var(--muted)" }}>(Optional)</small>
+                  <input
+                    type="tel"
+                    placeholder="Alternate mobile or shop landline"
+                    value={additionalPhone}
+                    onChange={(e) => {
+                      setAdditionalPhone(e.target.value);
+                      setShopPhone(e.target.value);
+                    }}
                     style={{
                       height: "44px",
                       borderRadius: "10px",
@@ -1694,13 +2439,10 @@ export default function RegisterShopFlow({
                       backgroundColor: "var(--bg)",
                     }}
                   />
-                  <span style={{ fontSize: "0.74rem", color: "var(--muted-dark)" }}>
-                    Speeds up verification and boosts your trusted partner badge.
-                  </span>
                 </label>
 
                 <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.84rem", fontWeight: "700" }}>
-                  Email Address <small style={{ color: "var(--muted)" }}>(Optional)</small>
+                  Email ID <small style={{ color: "var(--muted)" }}>(Optional)</small>
                   <input
                     type="email"
                     placeholder="workshop@example.com"
@@ -1739,7 +2481,7 @@ export default function RegisterShopFlow({
               </div>
             </div>
 
-            {/* Step 2: Workshop Identity & Types */}
+            {/* Step 2: Vehicle Types Supported */}
             <div style={{ marginBottom: "36px", paddingTop: "28px", borderTop: "1px solid var(--border)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "18px" }}>
                 <span
@@ -1757,86 +2499,43 @@ export default function RegisterShopFlow({
                 >
                   2
                 </span>
-                <h2 style={{ fontSize: "1.25rem", fontWeight: "800", margin: 0 }}>Shop Details & Vehicle Types</h2>
+                <h2 style={{ fontSize: "1.25rem", fontWeight: "800", margin: 0 }}>Vehicle Types Serviced *</h2>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "16px", marginBottom: "18px" }}>
-                <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.84rem", fontWeight: "700" }}>
-                  Shop / Garage Name *
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Sri Balaji Motors & Garage"
-                    value={shopName}
-                    onChange={(e) => setShopName(e.target.value)}
-                    style={{
-                      height: "44px",
-                      borderRadius: "10px",
-                      border: "1px solid var(--border)",
-                      padding: "0 14px",
-                      backgroundColor: "var(--bg)",
-                    }}
-                  />
-                </label>
-
-                <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.84rem", fontWeight: "700" }}>
-                  Shop Phone / Landline (Customer Facing)
-                  <input
-                    type="tel"
-                    placeholder="Landline or shop mobile"
-                    value={shopPhone}
-                    onChange={(e) => setShopPhone(e.target.value)}
-                    style={{
-                      height: "44px",
-                      borderRadius: "10px",
-                      border: "1px solid var(--border)",
-                      padding: "0 14px",
-                      backgroundColor: "var(--bg)",
-                    }}
-                  />
-                </label>
-              </div>
-
-              {/* Vehicle Types Supported */}
-              <div style={{ marginBottom: "8px" }}>
-                <span style={{ fontSize: "0.84rem", fontWeight: "700", display: "block", marginBottom: "8px" }}>
-                  Vehicle Types Serviced * (Select all that apply)
-                </span>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px" }}>
-                  {VEHICLE_OPTIONS.map(({ value, label, icon: Icon }) => {
-                    const active = vehicleTypes.includes(value);
-                    return (
-                      <button
-                        type="button"
-                        key={value}
-                        onClick={() => toggleVehicleType(value)}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                          padding: "10px 14px",
-                          borderRadius: "10px",
-                          border: "1.5px solid",
-                          borderColor: active ? "var(--red)" : "var(--border)",
-                          backgroundColor: active ? "var(--red-soft)" : "var(--bg)",
-                          color: active ? "var(--red)" : "var(--muted-dark)",
-                          fontWeight: "700",
-                          fontSize: "0.82rem",
-                          cursor: "pointer",
-                          textAlign: "left",
-                        }}
-                      >
-                        <Icon size={18} />
-                        <span style={{ flex: 1 }}>{label}</span>
-                        {active && <Check size={16} strokeWidth={2.5} />}
-                      </button>
-                    );
-                  })}
-                </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px" }}>
+                {VEHICLE_OPTIONS.map(({ value, label, icon: Icon }) => {
+                  const active = vehicleTypes.includes(value);
+                  return (
+                    <button
+                      type="button"
+                      key={value}
+                      onClick={() => toggleVehicleType(value)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        padding: "10px 14px",
+                        borderRadius: "10px",
+                        border: "1.5px solid",
+                        borderColor: active ? "var(--red)" : "var(--border)",
+                        backgroundColor: active ? "var(--red-soft)" : "var(--bg)",
+                        color: active ? "var(--red)" : "var(--muted-dark)",
+                        fontWeight: "700",
+                        fontSize: "0.82rem",
+                        cursor: "pointer",
+                        textAlign: "left",
+                      }}
+                    >
+                      <Icon size={18} />
+                      <span style={{ flex: 1 }}>{label}</span>
+                      {active && <Check size={16} strokeWidth={2.5} />}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Step 3: Location Picker with Live Leaflet Map */}
+            {/* Step 3: Exact Location Picker with Location Type Option */}
             <div style={{ marginBottom: "36px", paddingTop: "28px", borderTop: "1px solid var(--border)" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginBottom: "18px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -1858,7 +2557,7 @@ export default function RegisterShopFlow({
                   <div>
                     <h2 style={{ fontSize: "1.25rem", fontWeight: "800", margin: 0 }}>Exact Workshop Location</h2>
                     <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--muted-dark)" }}>
-                      Pinpoint your garage on the live map so motorists can get turn-by-turn navigation.
+                      Type your area or pin on the live map so nearby breakdown motorists can find you within 7 km.
                     </p>
                   </div>
                 </div>
@@ -1886,8 +2585,95 @@ export default function RegisterShopFlow({
                 </button>
               </div>
 
+              {/* Location Type Option: Type Area name to auto-pin on map */}
+              <div
+                style={{
+                  marginBottom: "18px",
+                  backgroundColor: "#fff8f0",
+                  border: "1.5px solid #fedfa7",
+                  borderRadius: "14px",
+                  padding: "16px 18px",
+                }}
+              >
+                <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.85rem", fontWeight: "800", color: "#92400e" }}>
+                  <span>📍 Location Type Option (Type Area name to automatically place pin on map):</span>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <input
+                      type="text"
+                      placeholder="Type area name (e.g. Chromepet, Tambaram, Anna Nagar, T. Nagar, Coimbatore)..."
+                      value={locationQuery}
+                      onChange={(e) => setLocationQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void handleSearchLocation();
+                        }
+                      }}
+                      style={{
+                        flex: 1,
+                        height: "44px",
+                        borderRadius: "10px",
+                        border: "1.5px solid #f97316",
+                        padding: "0 14px",
+                        backgroundColor: "#ffffff",
+                        fontSize: "0.88rem",
+                        fontWeight: "600",
+                        color: "#0f172a",
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleSearchLocation()}
+                      disabled={isSearchingLocation || !locationQuery.trim()}
+                      style={{
+                        padding: "0 18px",
+                        height: "44px",
+                        borderRadius: "10px",
+                        backgroundColor: "#f97316",
+                        color: "#ffffff",
+                        border: 0,
+                        fontSize: "0.85rem",
+                        fontWeight: "800",
+                        cursor: isSearchingLocation ? "not-allowed" : "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                      }}
+                    >
+                      <Search size={16} />
+                      <span>{isSearchingLocation ? "Locating..." : "Auto-Locate"}</span>
+                    </button>
+                  </div>
+                </label>
+                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "10px" }}>
+                  <span style={{ fontSize: "0.74rem", color: "#78350f", fontWeight: "700" }}>Quick Areas:</span>
+                  {["Chromepet", "Tambaram", "Guindy", "Anna Nagar", "Velachery", "Coimbatore", "Madurai", "Salem"].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => {
+                        setLocationQuery(preset);
+                        void handleSearchLocation(preset);
+                      }}
+                      style={{
+                        fontSize: "0.72rem",
+                        padding: "3px 9px",
+                        borderRadius: "6px",
+                        backgroundColor: "#ffffff",
+                        border: "1px solid #fedfa7",
+                        color: "#c2410c",
+                        cursor: "pointer",
+                        fontWeight: "700",
+                      }}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Address inputs */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "14px", marginBottom: "16px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "14px", marginBottom: "8px" }}>
                 <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.84rem", fontWeight: "700", gridColumn: "span 2" }}>
                   Full Workshop Address *
                   <input
@@ -1895,7 +2681,8 @@ export default function RegisterShopFlow({
                     required
                     placeholder="Shop door number, building name, street, landmark"
                     value={address}
-                    onChange={(e) => setAddress(e.target.value)}
+                    onChange={(e) => handleRegAddressFieldChange("address", e.target.value)}
+                    onBlur={() => handleSyncRegisterAddressToMap()}
                     style={{
                       height: "44px",
                       borderRadius: "10px",
@@ -1910,9 +2697,10 @@ export default function RegisterShopFlow({
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Chennai"
+                    placeholder="e.g. Erode / Coimbatore / Chennai"
                     value={city}
-                    onChange={(e) => setCity(e.target.value)}
+                    onChange={(e) => handleRegAddressFieldChange("city", e.target.value)}
+                    onBlur={() => handleSyncRegisterAddressToMap()}
                     style={{
                       height: "44px",
                       borderRadius: "10px",
@@ -1927,10 +2715,11 @@ export default function RegisterShopFlow({
                   <input
                     type="text"
                     required
-                    placeholder="600001"
+                    placeholder="e.g. 638452"
                     maxLength={10}
                     value={pincode}
-                    onChange={(e) => setPincode(e.target.value)}
+                    onChange={(e) => handleRegAddressFieldChange("pincode", e.target.value)}
+                    onBlur={() => handleSyncRegisterAddressToMap()}
                     style={{
                       height: "44px",
                       borderRadius: "10px",
@@ -1940,6 +2729,36 @@ export default function RegisterShopFlow({
                     }}
                   />
                 </label>
+              </div>
+
+              {/* Address to Map Sync Trigger & Status */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px", flexWrap: "wrap", gap: "8px" }}>
+                <button
+                  type="button"
+                  onClick={() => handleSyncRegisterAddressToMap()}
+                  disabled={syncingMapLocation}
+                  style={{
+                    padding: "7px 15px",
+                    borderRadius: "8px",
+                    backgroundColor: "#FF7900",
+                    color: "#fff",
+                    border: 0,
+                    fontSize: "0.78rem",
+                    fontWeight: "700",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                >
+                  <MapPin size={13} />
+                  {syncingMapLocation ? "Locating on Map..." : "📍 Auto-Move Map Pin to this Address"}
+                </button>
+                {syncSuccessMsg && (
+                  <span style={{ fontSize: "0.76rem", color: "#16a34a", fontWeight: "700" }}>
+                    {syncSuccessMsg}
+                  </span>
+                )}
               </div>
 
               {/* Interactive Leaflet Location Picker */}
@@ -1962,7 +2781,7 @@ export default function RegisterShopFlow({
                   }}
                   pickerMode={true}
                   pickedLocation={pickedCoords}
-                  onPickLocation={(coords) => setPickedCoords(coords)}
+                  onPickLocation={handlePickRegisterLocation}
                 />
 
                 <div

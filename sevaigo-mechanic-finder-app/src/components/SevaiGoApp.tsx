@@ -25,6 +25,7 @@ import OffersModal from "@/components/modals/OffersModal";
 import HelpModal from "@/components/modals/HelpModal";
 import MechanicMap, { type MapLocation } from "@/components/MechanicMap";
 import RegisterShopFlow from "@/components/RegisterShopFlow";
+import CustomerDashboard from "@/components/CustomerDashboard";
 import ShopCard from "@/components/ShopCard";
 import ShopDetail, { type ShopReview } from "@/components/ShopDetail";
 
@@ -91,7 +92,7 @@ export default function SevaiGoApp({
   initialShops: MechanicView[];
   initialUser: PublicUser | null;
 }) {
-  const [view, setView] = useState<View>("splash");
+  const [view, setView] = useState<View>("home");
   const [user, setUser] = useState<PublicUser | null>(initialUser);
   const [shops, setShops] = useState<MechanicView[]>(initialShops);
   const [location, setLocation] = useState<MapLocation>({ ...DEMO_LOCATION, label: "Detecting GPS...", source: "gps" });
@@ -281,7 +282,7 @@ export default function SevaiGoApp({
     setUserName("");
     void apiRequest("/api/auth", jsonOptions({ action: "logout" })).catch(() => {});
     say("Logged out safely.");
-    setView("splash");
+    setView("home");
   };
 
   const refreshShops = useCallback(
@@ -678,20 +679,56 @@ export default function SevaiGoApp({
   const selectedShop = shops.find((s) => s.id === selectedId) || null;
   const unreadCount = notices.filter((n) => !n.isRead).length;
 
-  // 1. SPLASH SCREEN VIEW
-  if (view === "splash") {
-    return <SplashScreen onEnter={() => goTo("home")} />;
+  // 1. Splash Loader while verifying auth
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen w-full bg-[#FFFFFF] flex flex-col items-center justify-center font-['DM_Sans',sans-serif]">
+        <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-200 flex items-center justify-center mb-3 shadow-sm">
+          <Image src="/images/sevaigo-logo.png" alt="SevaiGo" width={42} height={42} priority />
+        </div>
+        <div className="w-6 h-6 border-2 border-[#FF7900] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
   }
 
-  // 2. LOGIN SCREEN (When signed out)
-  if (!isLoggedIn) {
+  // 2. FIRST TIME / SIGNED OUT VIEW: Exactly 2 login options (Customer Login & Mechanic Login)
+  if (!isLoggedIn || !user) {
     return (
       <LoginView
         onLoginSuccess={handleLoginSuccess}
-        onContinueAsGuest={() => {
+        onRegisterWorkshop={() => {
           setIsLoggedIn(true);
-          goTo("home");
+          const mechUser = {
+            id: `u-mech-${Date.now()}`,
+            name: "Mechanic",
+            phone: "",
+            email: "partner@sevaigo.local",
+            role: "mechanic" as const,
+          };
+          setUser(mechUser);
+          setView("register-shop");
         }}
+      />
+    );
+  }
+
+  // 3. CUSTOMER VIEW: Dedicated Customer Rescue Dashboard (Only breakdown rescue, GPS, 2W/4W, Issue, Photo, Real Mechanics <= 7km, Spare parts)
+  if (user?.role === "customer") {
+    return (
+      <CustomerDashboard
+        user={user}
+        onLogout={handleFullLogout}
+        toastMessage={say}
+      />
+    );
+  }
+
+  // 4. MECHANIC VIEW: Mechanic Workshop Portal (Registration & Incoming Live Requests)
+  if (user?.role === "mechanic") {
+    return (
+      <RegisterShopFlow
+        initialUser={user}
+        onBack={handleFullLogout}
       />
     );
   }
@@ -825,7 +862,7 @@ export default function SevaiGoApp({
     </>
   );
 
-  // 3. NEARBY GARAGES VIEW
+  // 5. NEARBY GARAGES VIEW
   if (view === "garages") {
     return (
       <BikeBackground scene="garage" opacity={0.35}>
@@ -1178,37 +1215,6 @@ export default function SevaiGoApp({
     );
   }
 
-  // 9. REGISTER SHOP FLOW / MECHANIC DASHBOARD
-  if (view === "register-shop") {
-    if (user?.role === "customer") {
-      return (
-        <BikeBackground scene="garage" opacity={0.4}>
-          <div className="w-full max-w-md mx-auto px-4 py-16 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-4 border border-amber-200 shadow-sm">
-              <Wrench size={32} />
-            </div>
-            <h2 className="text-xl font-black text-slate-900 font-['Manrope'] mb-2">Mechanic Portal Only</h2>
-            <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-              Workshop registration and technician management are strictly reserved for verified mechanics. You are logged in with a Customer account.
-            </p>
-            <button
-              onClick={() => goTo("home")}
-              className="px-6 py-3 rounded-xl bg-[#FF7900] text-white font-bold text-sm shadow-md hover:bg-[#E56D00] transition-colors"
-            >
-              Return to Customer Dashboard
-            </button>
-          </div>
-          {renderModals()}
-        </BikeBackground>
-      );
-    }
-    return (
-      <BikeBackground scene="garage" opacity={0.4}>
-        <RegisterShopFlow initialUser={user} onBack={() => goTo(user?.role === "mechanic" ? "register-shop" : "home")} />
-        {renderModals()}
-      </BikeBackground>
-    );
-  }
 
   // 10. ACTIVITY / BOOKINGS VIEW
   if (view === "activity") {
