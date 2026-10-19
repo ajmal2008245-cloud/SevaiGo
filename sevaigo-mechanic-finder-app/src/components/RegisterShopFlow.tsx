@@ -708,7 +708,7 @@ export default function RegisterShopFlow({
               <span style={{ fontSize: "0.82rem", fontWeight: "700" }}>{user.name}</span>
             </div>
           ) : (
-            <span style={{ fontSize: "0.8rem", color: "var(--muted-dark)" }}>New Partner Registration</span>
+            <span style={{ fontSize: "0.8rem", color: "var(--muted-dark)" }}>Mechanic Portal</span>
           )}
         </div>
       </header>
@@ -718,14 +718,15 @@ export default function RegisterShopFlow({
         {/* Banner Section */}
         <section
           style={{
-            background: "linear-gradient(135deg, #1b2838 0%, #151e2a 100%)",
-            color: "#ffffff",
+            background: "#FFFFFF",
+            color: "#0F172A",
+            border: "1px solid #E2E8F0",
             borderRadius: "20px",
             padding: "36px 32px",
             marginBottom: "32px",
             position: "relative",
             overflow: "hidden",
-            boxShadow: "0 12px 36px rgba(10, 20, 30, 0.15)",
+            boxShadow: "0 4px 20px rgba(0, 0, 0, 0.05)",
           }}
         >
           <div style={{ maxWidth: "660px", position: "relative", zIndex: 2 }}>
@@ -734,9 +735,9 @@ export default function RegisterShopFlow({
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "6px",
-                background: "rgba(240, 90, 62, 0.2)",
-                color: "#ff7d63",
-                padding: "4px 12px",
+                background: "rgba(255, 121, 0, 0.1)",
+                color: "#FF7900",
+                padding: "5px 12px",
                 borderRadius: "20px",
                 fontSize: "0.76rem",
                 fontWeight: "800",
@@ -747,11 +748,11 @@ export default function RegisterShopFlow({
             >
               <Sparkles size={14} /> SEVAIGO Mechanic Partner Portal
             </span>
-            <h1 style={{ fontSize: "2.1rem", fontWeight: "800", letterSpacing: "-0.04em", margin: "0 0 12px", lineHeight: 1.25 }}>
+            <h1 style={{ fontSize: "2.1rem", fontWeight: "800", letterSpacing: "-0.04em", margin: "0 0 12px", lineHeight: 1.25, color: "#0F172A" }}>
               Register Your Workshop. <br />
-              <span style={{ color: "#f27866" }}>Connect with Stranded Motorists.</span>
+              <span style={{ color: "#FF7900" }}>Connect with Stranded Motorists.</span>
             </h1>
-            <p style={{ fontSize: "0.95rem", color: "#b9c7d4", lineHeight: 1.55, margin: 0 }}>
+            <p style={{ fontSize: "0.95rem", color: "#64748B", lineHeight: 1.55, margin: 0 }}>
               Join Tamil Nadu’s leading real-time roadside assistance network. Register your garage, define your services, pin your precise workshop location, and receive immediate assistance calls when drivers and riders break down nearby.
             </p>
           </div>
@@ -761,8 +762,9 @@ export default function RegisterShopFlow({
               position: "absolute",
               right: "24px",
               bottom: "-10px",
-              opacity: 0.12,
+              opacity: 0.05,
               pointerEvents: "none",
+              color: "#0F172A",
             }}
           >
             <Store size={220} strokeWidth={1} />
@@ -1633,12 +1635,12 @@ export default function RegisterShopFlow({
                 >
                   1
                 </span>
-                <h2 style={{ fontSize: "1.25rem", fontWeight: "800", margin: 0 }}>Owner & Account Credentials</h2>
+                <h2 style={{ fontSize: "1.25rem", fontWeight: "800", margin: 0 }}>Mechanic & Workshop Credentials</h2>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
                 <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.84rem", fontWeight: "700" }}>
-                  Owner Full Name *
+                  Mechanic Full Name *
                   <input
                     type="text"
                     required

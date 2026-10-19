@@ -47,9 +47,6 @@ export type View =
   | "saved"
   | "vehicles"
   | "activity"
-  | "partner"
-  | "owner"
-  | "admin"
   | "register-shop";
 
 type VehicleItem = { id: string; make: string; model: string; year: number; type: string; registration: string | null; createdAt: string };
@@ -191,19 +188,26 @@ export default function SevaiGoApp({
       const storedLoggedIn = localStorage.getItem("isLoggedIn");
       const storedPhone = localStorage.getItem("userPhone");
       const storedName = localStorage.getItem("userName");
+      const storedRole = (localStorage.getItem("userRole") as "customer" | "mechanic") || "customer";
+
       if (storedLoggedIn === "true" && storedPhone) {
         setIsLoggedIn(true);
         setUserPhone(storedPhone);
-        setUserName(storedName || `Rider ${storedPhone.slice(-4)}`);
+        setUserName(storedName || (storedRole === "mechanic" ? `Mechanic ${storedPhone.slice(-4)}` : `Rider ${storedPhone.slice(-4)}`));
         setRescuePhone(storedPhone);
-        setRescueName(storedName || `Rider ${storedPhone.slice(-4)}`);
+        setRescueName(storedName || (storedRole === "mechanic" ? `Mechanic ${storedPhone.slice(-4)}` : `Rider ${storedPhone.slice(-4)}`));
         setUser({
           id: `u-${storedPhone}`,
-          name: storedName || `Rider ${storedPhone.slice(-4)}`,
+          name: storedName || (storedRole === "mechanic" ? `Mechanic ${storedPhone.slice(-4)}` : `Rider ${storedPhone.slice(-4)}`),
           phone: storedPhone,
           email: `${storedPhone}@sevaigo.local`,
-          role: "rider",
+          role: storedRole,
         });
+
+        // Set initial view according to role
+        if (storedRole === "mechanic") {
+          setView("register-shop");
+        }
       }
 
       const cachedLocStr = localStorage.getItem("userSavedLocation");
@@ -217,13 +221,31 @@ export default function SevaiGoApp({
     setCheckingAuth(false);
   }, []);
 
-  const handleLoginSuccess = (phone: string, inputName?: string) => {
-    const finalName = inputName || `Rider ${phone.slice(-4)}`;
+  const handleLoginSuccess = async (phone: string, inputName?: string, role: "customer" | "mechanic" = "customer") => {
+    let finalRole = role;
+    let finalName = inputName || (role === "mechanic" ? `Mechanic ${phone.slice(-4)}` : `Rider ${phone.slice(-4)}`);
+
+    // Verify role securely with Supabase profiles table
+    try {
+      const res = await fetch("/api/auth/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, name: finalName, role }),
+      });
+      const data = await res.json().catch(() => null);
+      if (data?.profile?.role) {
+        finalRole = data.profile.role;
+        finalName = data.profile.name || finalName;
+      }
+    } catch {}
+
     try {
       localStorage.setItem("isLoggedIn", "true");
       localStorage.setItem("userPhone", phone);
       localStorage.setItem("userName", finalName);
+      localStorage.setItem("userRole", finalRole);
     } catch {}
+
     setIsLoggedIn(true);
     setUserPhone(phone);
     setUserName(finalName);
@@ -234,18 +256,16 @@ export default function SevaiGoApp({
       name: finalName,
       phone,
       email: `${phone}@sevaigo.local`,
-      role: "rider",
+      role: finalRole,
     });
 
-    // Sync with Supabase users table
-    void supabase.from("users").upsert({
-      phone,
-      name: finalName,
-      updated_at: new Date().toISOString(),
-    });
-
-    setView("home");
-    say("Logged in successfully! Welcome to SevaiGo.");
+    if (finalRole === "mechanic") {
+      setView("register-shop");
+      say(`Signed in as Mechanic! Welcome to your workshop portal, ${finalName}.`);
+    } else {
+      setView("home");
+      say(`Signed in as Customer! Welcome to SevaiGo, ${finalName}.`);
+    }
   };
 
   const handleFullLogout = () => {
@@ -253,6 +273,7 @@ export default function SevaiGoApp({
       localStorage.removeItem("isLoggedIn");
       localStorage.removeItem("userPhone");
       localStorage.removeItem("userName");
+      localStorage.removeItem("userRole");
     } catch {}
     setIsLoggedIn(false);
     setUser(null);
@@ -485,6 +506,16 @@ export default function SevaiGoApp({
   }
 
   function goTo(next: View) {
+    if (next === "register-shop" && user?.role === "customer") {
+      say("Workshop registration & management is for registered mechanics only.");
+      setView("home");
+      return;
+    }
+    if ((next === "booking" || next === "rescue") && user?.role === "mechanic") {
+      say("Mechanics manage repair jobs from their Workshop Dashboard.");
+      setView("register-shop");
+      return;
+    }
     setView(next);
     setMobileMenuOpen(false);
     setNotificationOpen(false);
@@ -814,6 +845,28 @@ export default function SevaiGoApp({
 
   // 4. STEP-BY-STEP BOOKING FLOW
   if (view === "booking") {
+    if (user?.role === "mechanic") {
+      return (
+        <BikeBackground scene="garage" opacity={0.4}>
+          <div className="w-full max-w-md mx-auto px-4 py-16 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-orange-50 text-[#FF7900] flex items-center justify-center mx-auto mb-4 border border-orange-200 shadow-sm">
+              <Store size={32} />
+            </div>
+            <h2 className="text-xl font-black text-slate-900 font-['Manrope'] mb-2">Mechanic Portal</h2>
+            <p className="text-sm text-slate-600 mb-6 leading-relaxed">
+              As a registered mechanic, you receive and manage customer repair bookings directly from your Workshop Dashboard.
+            </p>
+            <button
+              onClick={() => goTo("register-shop")}
+              className="px-6 py-3 rounded-xl bg-[#FF7900] text-white font-bold text-sm shadow-md hover:bg-[#E56D00] transition-colors"
+            >
+              Open Workshop Dashboard
+            </button>
+          </div>
+          {renderModals()}
+        </BikeBackground>
+      );
+    }
     return (
       <BikeBackground scene="garage" opacity={0.4}>
         <ServiceBookingFlow
@@ -1125,11 +1178,33 @@ export default function SevaiGoApp({
     );
   }
 
-  // 9. REGISTER SHOP FLOW
+  // 9. REGISTER SHOP FLOW / MECHANIC DASHBOARD
   if (view === "register-shop") {
+    if (user?.role === "customer") {
+      return (
+        <BikeBackground scene="garage" opacity={0.4}>
+          <div className="w-full max-w-md mx-auto px-4 py-16 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-4 border border-amber-200 shadow-sm">
+              <Wrench size={32} />
+            </div>
+            <h2 className="text-xl font-black text-slate-900 font-['Manrope'] mb-2">Mechanic Portal Only</h2>
+            <p className="text-sm text-slate-600 mb-6 leading-relaxed">
+              Workshop registration and technician management are strictly reserved for verified mechanics. You are logged in with a Customer account.
+            </p>
+            <button
+              onClick={() => goTo("home")}
+              className="px-6 py-3 rounded-xl bg-[#FF7900] text-white font-bold text-sm shadow-md hover:bg-[#E56D00] transition-colors"
+            >
+              Return to Customer Dashboard
+            </button>
+          </div>
+          {renderModals()}
+        </BikeBackground>
+      );
+    }
     return (
       <BikeBackground scene="garage" opacity={0.4}>
-        <RegisterShopFlow initialUser={user} onBack={() => goTo("home")} />
+        <RegisterShopFlow initialUser={user} onBack={() => goTo(user?.role === "mechanic" ? "register-shop" : "home")} />
         {renderModals()}
       </BikeBackground>
     );
@@ -1193,12 +1268,12 @@ export default function SevaiGoApp({
             className="fixed inset-0 bg-black/70 backdrop-blur-sm"
             onClick={() => setMobileMenuOpen(false)}
           />
-          <div className="relative w-72 max-w-[80vw] h-full bg-[#0D1117] border-r border-white/10 p-6 flex flex-col justify-between z-10 text-white animate-in slide-in-from-left duration-200">
+          <div className="relative w-72 max-w-[80vw] h-full bg-[#FFFFFF] border-r border-[#E2E8F0] p-6 flex flex-col justify-between z-10 text-slate-900 shadow-2xl animate-in slide-in-from-left duration-200">
             <div>
               {/* Brand Header */}
-              <div className="flex items-center justify-between pb-6 border-b border-white/10">
+              <div className="flex items-center justify-between pb-6 border-b border-[#E2E8F0]">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-10 h-10 rounded-xl overflow-hidden bg-black flex items-center justify-center border border-white/10 shadow-md">
+                  <div className="w-10 h-10 rounded-xl overflow-hidden bg-black flex items-center justify-center border border-slate-200 shadow-md">
                     <Image
                       src="/images/sevaigo-logo.png"
                       alt="SevaiGo Logo"
@@ -1208,33 +1283,42 @@ export default function SevaiGoApp({
                     />
                   </div>
                   <div>
-                    <h2 className="text-lg font-black font-['Manrope'] leading-none">
+                    <h2 className="text-lg font-black font-['Manrope'] leading-none text-slate-900">
                       Sevai<span className="text-[#FF7900]">Go</span>
                     </h2>
-                    <span className="text-[10px] text-[#A5ADB8]">Precision Moto Care</span>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                      {user?.role === "mechanic" ? "Mechanic Portal" : "Precision Moto Care"}
+                    </span>
                   </div>
                 </div>
 
                 <button
                   onClick={() => setMobileMenuOpen(false)}
-                  className="text-[#A5ADB8] hover:text-white"
+                  className="text-slate-400 hover:text-slate-900"
                 >
                   <X size={20} />
                 </button>
               </div>
 
-              {/* Navigation Items */}
+              {/* Navigation Items (Role filtered) */}
               <nav className="py-6 space-y-1.5">
-                {[
-                  { view: "home" as const, label: "Home Dashboard", icon: Store },
-                  { view: "booking" as const, label: "Book a Service", icon: Wrench },
-                  { view: "garages" as const, label: "Nearby Garages & Map", icon: MapPin },
-                  { view: "track" as const, label: "Track Service", icon: Navigation },
-                  { view: "rescue" as const, label: "Roadside Rescue (SOS)", icon: Zap },
-                  { view: "activity" as const, label: "My Bookings", icon: Calendar },
-                  { view: "register-shop" as const, label: "Register Workshop", icon: Plus },
-                  { view: "profile" as const, label: "My Profile & Bikes", icon: User },
-                ].map((item) => {
+                {(user?.role === "mechanic"
+                  ? [
+                      { view: "register-shop" as const, label: "Workshop Dashboard", icon: Store },
+                      { view: "garages" as const, label: "Nearby Garages & Map", icon: MapPin },
+                      { view: "track" as const, label: "Track Service", icon: Navigation },
+                      { view: "profile" as const, label: "My Profile", icon: User },
+                    ]
+                  : [
+                      { view: "home" as const, label: "Home Dashboard", icon: Store },
+                      { view: "booking" as const, label: "Book a Service", icon: Wrench },
+                      { view: "garages" as const, label: "Nearby Garages & Map", icon: MapPin },
+                      { view: "track" as const, label: "Track Service", icon: Navigation },
+                      { view: "rescue" as const, label: "Roadside Rescue (SOS)", icon: Zap },
+                      { view: "activity" as const, label: "My Bookings", icon: Calendar },
+                      { view: "profile" as const, label: "My Profile & Bikes", icon: User },
+                    ]
+                ).map((item) => {
                   const Icon = item.icon;
                   const isActive = view === item.view;
                   return (
@@ -1244,7 +1328,7 @@ export default function SevaiGoApp({
                       className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
                         isActive
                           ? "bg-[#FF7900] text-white shadow-[0_4px_15px_rgba(255,121,0,0.35)]"
-                          : "text-[#A5ADB8] hover:bg-white/5 hover:text-white"
+                          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                       }`}
                     >
                       <Icon size={18} />
@@ -1256,19 +1340,19 @@ export default function SevaiGoApp({
             </div>
 
             {/* Bottom Actions */}
-            <div className="pt-4 border-t border-white/10 space-y-3">
-              <div className="flex items-center justify-between text-xs text-[#A5ADB8]">
+            <div className="pt-4 border-t border-[#E2E8F0] space-y-3">
+              <div className="flex items-center justify-between text-xs text-slate-500">
                 <span>Language</span>
                 <div className="flex gap-1">
                   <button
                     onClick={() => setLanguage("en")}
-                    className={`px-2 py-1 rounded text-[11px] font-bold ${language === "en" ? "bg-[#FF7900] text-white" : "text-[#A5ADB8]"}`}
+                    className={`px-2 py-1 rounded text-[11px] font-bold ${language === "en" ? "bg-[#FF7900] text-white" : "text-slate-600 bg-slate-100"}`}
                   >
                     EN
                   </button>
                   <button
                     onClick={() => setLanguage("ta")}
-                    className={`px-2 py-1 rounded text-[11px] font-bold ${language === "ta" ? "bg-[#FF7900] text-white" : "text-[#A5ADB8]"}`}
+                    className={`px-2 py-1 rounded text-[11px] font-bold ${language === "ta" ? "bg-[#FF7900] text-white" : "text-slate-600 bg-slate-100"}`}
                   >
                     தமிழ்
                   </button>
@@ -1277,7 +1361,7 @@ export default function SevaiGoApp({
 
               <button
                 onClick={handleFullLogout}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/5 hover:bg-red-500/15 text-xs font-bold text-red-400 border border-white/10 transition-colors"
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-50 hover:bg-red-100 text-xs font-bold text-red-600 border border-red-200 transition-colors"
               >
                 <LogOut size={15} />
                 <span>Sign Out</span>
@@ -1373,61 +1457,121 @@ export default function SevaiGoApp({
           </button>
         </div>
 
-        {/* Two Clear Options: 1. I Need a Mechanic  2. I'm a Mechanic */}
+        {/* Two Clear Options Tailored to Role */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-          {/* Option 1: I Need a Mechanic */}
-          <button
-            type="button"
-            onClick={() => goTo("rescue")}
-            className="group relative overflow-hidden p-5 rounded-2xl bg-gradient-to-br from-[#121820] via-[#161f2c] to-[#0D1117] border-2 border-[#FF7900]/40 hover:border-[#FF7900] transition-all duration-300 text-left shadow-[0_8px_30px_rgba(0,0,0,0.5)] hover:shadow-[0_12px_36px_rgba(255,121,0,0.25)] cursor-pointer active:scale-[0.99]"
-          >
-            <div className="flex items-start justify-between mb-3">
-              <div className="w-12 h-12 rounded-xl bg-[#FF7900] text-white flex items-center justify-center shadow-lg shadow-[#FF7900]/30 group-hover:scale-105 transition-transform duration-200">
-                <Wrench size={24} strokeWidth={2.4} />
-              </div>
-              <span className="px-2.5 py-0.5 rounded-full bg-[#FF7900]/15 text-[#FF7900] border border-[#FF7900]/30 text-[10px] font-extrabold tracking-wider uppercase">
-                Rescue Me
-              </span>
-            </div>
-            <h2 className="text-lg md:text-xl font-black text-white font-['Manrope'] mb-1 flex items-center gap-2">
-              <span>I Need a Mechanic</span>
-              <ArrowRight size={18} className="text-[#FF7900] group-hover:translate-x-1 transition-transform duration-200" />
-            </h2>
-            <p className="text-xs text-[#A5ADB8] leading-relaxed mb-3">
-              Puncture, battery, or breakdown? Get nearby mechanics dispatched to your live GPS coordinates.
-            </p>
-            <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#FF7900]">
-              <span className="w-2 h-2 rounded-full bg-[#00E5FF] animate-pulse" />
-              <span>Live GPS • Direct Call • Track Live</span>
-            </div>
-          </button>
+          {user?.role === "mechanic" ? (
+            <>
+              {/* Mechanic Option 1: Workshop Dashboard */}
+              <button
+                type="button"
+                onClick={() => goTo("register-shop")}
+                className="group relative overflow-hidden p-5 rounded-2xl bg-white border-2 border-[#FF7900]/40 hover:border-[#FF7900] transition-all duration-300 text-left shadow-sm hover:shadow-md cursor-pointer active:scale-[0.99]"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="w-12 h-12 rounded-xl bg-[#FF7900] text-white flex items-center justify-center shadow-lg shadow-[#FF7900]/25 group-hover:scale-105 transition-transform duration-200">
+                    <Store size={24} strokeWidth={2.4} />
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full bg-[#FF7900]/10 text-[#FF7900] border border-[#FF7900]/30 text-[10px] font-extrabold tracking-wider uppercase">
+                    Mechanic Portal
+                  </span>
+                </div>
+                <h2 className="text-lg md:text-xl font-black text-slate-900 font-['Manrope'] mb-1 flex items-center gap-2">
+                  <span>Workshop Dashboard</span>
+                  <ArrowRight size={18} className="text-[#FF7900] group-hover:translate-x-1 transition-transform duration-200" />
+                </h2>
+                <p className="text-xs text-slate-600 leading-relaxed mb-3">
+                  View incoming rescue calls, toggle Online/Offline availability, and update workshop pricing & info.
+                </p>
+                <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#FF7900]">
+                  <span className="w-2 h-2 rounded-full bg-[#10B981] animate-pulse" />
+                  <span>Live Dispatch • Shop Profile • Rescue Alerts</span>
+                </div>
+              </button>
 
-          {/* Option 2: I'm a Mechanic */}
-          <button
-            type="button"
-            onClick={() => goTo("register-shop")}
-            className="group relative overflow-hidden p-5 rounded-2xl bg-gradient-to-br from-[#121820] via-[#151c27] to-[#0D1117] border border-white/10 hover:border-[#FF7900]/60 transition-all duration-300 text-left shadow-[0_8px_30px_rgba(0,0,0,0.5)] hover:shadow-[0_12px_36px_rgba(255,121,0,0.15)] cursor-pointer active:scale-[0.99]"
-          >
-            <div className="flex items-start justify-between mb-3">
-              <div className="w-12 h-12 rounded-xl bg-[#1c2430] border border-white/10 group-hover:border-[#FF7900]/40 text-[#FF7900] flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-200">
-                <Store size={24} strokeWidth={2.2} />
-              </div>
-              <span className="px-2.5 py-0.5 rounded-full bg-white/5 text-[#A5ADB8] border border-white/10 text-[10px] font-extrabold tracking-wider uppercase group-hover:text-white group-hover:border-[#FF7900]/30 transition-colors">
-                Partner
-              </span>
-            </div>
-            <h2 className="text-lg md:text-xl font-black text-white font-['Manrope'] mb-1 flex items-center gap-2">
-              <span>I&apos;m a Mechanic</span>
-              <ArrowRight size={18} className="text-[#A5ADB8] group-hover:text-[#FF7900] group-hover:translate-x-1 transition-transform duration-200" />
-            </h2>
-            <p className="text-xs text-[#A5ADB8] leading-relaxed mb-3">
-              Register your garage, toggle Online / Offline, accept nearby rescue requests, and navigate to riders.
-            </p>
-            <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#A5ADB8] group-hover:text-[#FF7900] transition-colors">
-              <span className="w-2 h-2 rounded-full bg-[#10B981]" />
-              <span>Register Garage • Live Requests • Turn-by-Turn</span>
-            </div>
-          </button>
+              {/* Mechanic Option 2: Explore Network Garages */}
+              <button
+                type="button"
+                onClick={() => goTo("garages")}
+                className="group relative overflow-hidden p-5 rounded-2xl bg-white border border-slate-200 hover:border-[#FF7900]/60 transition-all duration-300 text-left shadow-sm hover:shadow-md cursor-pointer active:scale-[0.99]"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="w-12 h-12 rounded-xl bg-orange-50 border border-orange-100 text-[#FF7900] flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform duration-200">
+                    <MapPin size={24} strokeWidth={2.2} />
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-extrabold tracking-wider uppercase">
+                    Directory
+                  </span>
+                </div>
+                <h2 className="text-lg md:text-xl font-black text-slate-900 font-['Manrope'] mb-1 flex items-center gap-2">
+                  <span>Certified Garages</span>
+                  <ArrowRight size={18} className="text-slate-400 group-hover:text-[#FF7900] group-hover:translate-x-1 transition-transform duration-200" />
+                </h2>
+                <p className="text-xs text-slate-600 leading-relaxed mb-3">
+                  Browse verified peer garages and partner workshops across Tamil Nadu on the live map.
+                </p>
+                <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 group-hover:text-[#FF7900] transition-colors">
+                  <span className="w-2 h-2 rounded-full bg-blue-500" />
+                  <span>Partner Network • Live Map • Ratings</span>
+                </div>
+              </button>
+            </>
+          ) : (
+            <>
+              {/* Customer Option 1: I Need a Mechanic */}
+              <button
+                type="button"
+                onClick={() => goTo("rescue")}
+                className="group relative overflow-hidden p-5 rounded-2xl bg-white border-2 border-[#FF7900]/40 hover:border-[#FF7900] transition-all duration-300 text-left shadow-sm hover:shadow-md cursor-pointer active:scale-[0.99]"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="w-12 h-12 rounded-xl bg-[#FF7900] text-white flex items-center justify-center shadow-lg shadow-[#FF7900]/25 group-hover:scale-105 transition-transform duration-200">
+                    <Wrench size={24} strokeWidth={2.4} />
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full bg-[#FF7900]/10 text-[#FF7900] border border-[#FF7900]/30 text-[10px] font-extrabold tracking-wider uppercase">
+                    Rescue Me
+                  </span>
+                </div>
+                <h2 className="text-lg md:text-xl font-black text-slate-900 font-['Manrope'] mb-1 flex items-center gap-2">
+                  <span>I Need a Mechanic</span>
+                  <ArrowRight size={18} className="text-[#FF7900] group-hover:translate-x-1 transition-transform duration-200" />
+                </h2>
+                <p className="text-xs text-slate-600 leading-relaxed mb-3">
+                  Puncture, battery, or breakdown? Get nearby mechanics dispatched to your live GPS coordinates.
+                </p>
+                <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#FF7900]">
+                  <span className="w-2 h-2 rounded-full bg-[#00E5FF] animate-pulse" />
+                  <span>Live GPS • Direct Call • Track Live</span>
+                </div>
+              </button>
+
+              {/* Customer Option 2: Explore Certified Garages */}
+              <button
+                type="button"
+                onClick={() => goTo("garages")}
+                className="group relative overflow-hidden p-5 rounded-2xl bg-white border border-slate-200 hover:border-[#FF7900]/60 transition-all duration-300 text-left shadow-sm hover:shadow-md cursor-pointer active:scale-[0.99]"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="w-12 h-12 rounded-xl bg-orange-50 border border-orange-100 text-[#FF7900] flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform duration-200">
+                    <Store size={24} strokeWidth={2.2} />
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-extrabold tracking-wider uppercase">
+                    Garages
+                  </span>
+                </div>
+                <h2 className="text-lg md:text-xl font-black text-slate-900 font-['Manrope'] mb-1 flex items-center gap-2">
+                  <span>Certified Garages</span>
+                  <ArrowRight size={18} className="text-slate-400 group-hover:text-[#FF7900] group-hover:translate-x-1 transition-transform duration-200" />
+                </h2>
+                <p className="text-xs text-slate-600 leading-relaxed mb-3">
+                  Find top-rated workshops nearby, check transparent repair prices, read real rider reviews, and book.
+                </p>
+                <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 group-hover:text-[#FF7900] transition-colors">
+                  <span className="w-2 h-2 rounded-full bg-[#10B981]" />
+                  <span>Verified Shops • Real Reviews • Upfront Rates</span>
+                </div>
+              </button>
+            </>
+          )}
         </div>
 
         {/* Quick Utilities Row */}
@@ -1565,29 +1709,36 @@ export default function SevaiGoApp({
           </div>
         </div>
 
-        {/* Slogan Footer Banner (Screen 9 match) */}
-        <div className="p-4 rounded-2xl bg-gradient-to-r from-[#0D1117] via-[#121820] to-[#0D1117] border border-white/10 text-center my-4">
+        {/* Slogan Footer Banner */}
+        <div className="p-4 rounded-2xl bg-white border border-[#E2E8F0] shadow-sm text-center my-4">
           <div className="inline-flex items-center gap-1.5 text-xs font-extrabold text-[#FF7900] tracking-wider uppercase mb-1">
             <Sparkles size={14} />
             <span>Every Ride Deserves The Best</span>
           </div>
-          <p className="text-[11px] text-[#A5ADB8]">
+          <p className="text-[11px] text-slate-500 font-medium">
             Quick Service · Trusted Mechanics · Always Nearby
           </p>
         </div>
       </div>
 
-      {/* Persistent Bottom Mobile Navigation Bar (Exact match to Screens 3, 4, 8) */}
+      {/* Persistent Bottom Mobile Navigation Bar */}
       <nav
-        className="fixed bottom-0 inset-x-0 z-40 bg-[#07090C]/95 backdrop-blur-xl border-t border-white/10 py-2 px-6 flex items-center justify-around shadow-[0_-10px_30px_rgba(0,0,0,0.8)]"
+        className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-xl border-t border-[#E2E8F0] py-2 px-6 flex items-center justify-around shadow-[0_-4px_20px_rgba(0,0,0,0.06)]"
         aria-label="Bottom Navigation"
       >
-        {[
-          { id: "home" as const, label: "Home", icon: Store },
-          { id: "activity" as const, label: "Bookings", icon: Calendar },
-          { id: "garages" as const, label: "Garage", icon: MapPin },
-          { id: "profile" as const, label: "Profile", icon: User },
-        ].map((tab) => {
+        {(user?.role === "mechanic"
+          ? [
+              { id: "register-shop" as const, label: "Workshop", icon: Store },
+              { id: "garages" as const, label: "Garages", icon: MapPin },
+              { id: "profile" as const, label: "Profile", icon: User },
+            ]
+          : [
+              { id: "home" as const, label: "Home", icon: Store },
+              { id: "garages" as const, label: "Garages", icon: MapPin },
+              { id: "activity" as const, label: "Bookings", icon: Calendar },
+              { id: "profile" as const, label: "Profile", icon: User },
+            ]
+        ).map((tab) => {
           const Icon = tab.icon;
           const isActive = view === tab.id;
           return (
@@ -1596,7 +1747,7 @@ export default function SevaiGoApp({
               type="button"
               onClick={() => goTo(tab.id)}
               className={`flex flex-col items-center gap-1 py-1 px-3 transition-colors cursor-pointer ${
-                isActive ? "text-[#FF7900]" : "text-[#A5ADB8] hover:text-white"
+                isActive ? "text-[#FF7900]" : "text-slate-500 hover:text-slate-900"
               }`}
             >
               <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />

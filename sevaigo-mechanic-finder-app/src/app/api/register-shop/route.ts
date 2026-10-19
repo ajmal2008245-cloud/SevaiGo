@@ -5,6 +5,7 @@ import { mechanics, users } from "@/db/schema";
 import { cleanText } from "@/lib/api";
 import { createSession, getSessionUser, hashPassword } from "@/lib/auth";
 import { supabase } from "@/lib/supabaseClient";
+import { getOrVerifyProfile } from "@/lib/profile-service";
 
 export const dynamic = "force-dynamic";
 
@@ -155,7 +156,7 @@ export async function POST(request: Request) {
               email: userEmail,
               phone: cleanPhone,
               passwordHash: hashPassword(userPassword),
-              role: "owner",
+              role: "mechanic",
             })
             .returning();
           activeUserId = newUser.id;
@@ -163,6 +164,8 @@ export async function POST(request: Request) {
         if (activeUserId) {
           await createSession(activeUserId).catch(() => {});
         }
+        // Ensure profile exists in Supabase profiles as mechanic
+        await getOrVerifyProfile(cleanPhone, ownerName, "mechanic").catch(() => {});
       } catch (authErr: any) {
         console.warn("[RegisterShop API] Auth session handling note:", authErr?.message);
       }

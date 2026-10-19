@@ -105,27 +105,27 @@ export default function NearbyGaragesView({
     };
 
   return (
-    <div className="relative w-full min-h-screen bg-[#07090C] text-white flex flex-col font-['DM_Sans',sans-serif]">
+    <div className="relative w-full min-h-screen bg-[#FFFFFF] text-[#0F172A] flex flex-col font-['DM_Sans',sans-serif]">
       {/* Top Floating Header & Search Bar */}
-      <div className="sticky top-0 z-30 bg-[#07090C]/90 backdrop-blur-md border-b border-white/10 px-4 pt-3 pb-3">
+      <div className="sticky top-0 z-30 bg-[#FFFFFF]/95 backdrop-blur-md border-b border-[#E2E8F0] px-4 pt-3 pb-3">
         <div className="max-w-xl mx-auto flex items-center justify-between mb-3">
           <button
             type="button"
             onClick={onBack}
-            className="w-10 h-10 rounded-full bg-[#121820] border border-white/10 flex items-center justify-center text-[#A5ADB8] hover:text-white transition-colors cursor-pointer"
+            className="w-10 h-10 rounded-full bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-center text-[#64748B] hover:text-[#0F172A] transition-colors cursor-pointer"
             aria-label="Back"
           >
             <ArrowLeft size={18} />
           </button>
 
-          <h1 className="text-lg font-extrabold text-white tracking-tight font-['Manrope']">
+          <h1 className="text-lg font-extrabold text-[#0F172A] tracking-tight font-['Manrope']">
             Nearby Garages
           </h1>
 
           <button
             type="button"
             onClick={() => setViewMode(viewMode === "map" ? "list" : "map")}
-            className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-[#FF7900] hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-full bg-[#F8FAFC] border border-[#CBD5E1] text-xs font-bold text-[#FF7900] hover:bg-[#F1F5F9] transition-colors cursor-pointer flex items-center gap-1.5"
           >
             <Compass size={14} />
             <span>{viewMode === "map" ? "List View" : "Map View"}</span>
@@ -133,8 +133,8 @@ export default function NearbyGaragesView({
         </div>
 
         {/* Search Field */}
-        <div className="max-w-xl mx-auto relative flex items-center rounded-xl bg-[#121820] border border-[#1F2733] focus-within:border-[#FF7900] transition-colors mb-3">
-          <span className="pl-3.5 text-[#A5ADB8]">
+        <div className="max-w-xl mx-auto relative flex items-center rounded-xl bg-[#F8FAFC] border border-[#CBD5E1] focus-within:border-[#FF7900] transition-colors mb-3">
+          <span className="pl-3.5 text-[#64748B]">
             <Search size={17} />
           </span>
           <input
@@ -142,7 +142,7 @@ export default function NearbyGaragesView({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search garage or area..."
-            className="w-full bg-transparent px-3 py-2.5 text-xs md:text-sm text-white placeholder-[#505a69] outline-none"
+            className="w-full bg-transparent px-3 py-2.5 text-xs md:text-sm text-[#0F172A] placeholder-[#94A3B8] outline-none"
           />
         </div>
 
@@ -162,8 +162,8 @@ export default function NearbyGaragesView({
                 onClick={() => setFilter(tab.id)}
                 className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
                   isActive
-                    ? "bg-[#FF7900] text-white shadow-[0_4px_15px_rgba(255,121,0,0.4)]"
-                    : "bg-[#121820] text-[#A5ADB8] hover:text-white border border-[#1F2733]"
+                    ? "bg-[#FF7900] text-white shadow-xs"
+                    : "bg-[#F1F5F9] text-[#64748B] hover:text-[#0F172A] border border-[#E2E8F0]"
                 }`}
               >
                 {tab.label}
@@ -177,7 +177,7 @@ export default function NearbyGaragesView({
       <div className="flex-1 relative w-full pb-36">
         {viewMode === "map" ? (
           <div className="relative w-full h-[calc(100vh-190px)] min-h-[460px]">
-            {/* Interactive Leaflet Dark Map */}
+            {/* Interactive Leaflet Map */}
             <MechanicMap
               shops={filteredShops}
               location={location}
@@ -187,7 +187,7 @@ export default function NearbyGaragesView({
             />
 
             {/* Subtle Gradient Vignette Over Map Bottom */}
-            <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#07090C] via-[#07090C]/60 to-transparent pointer-events-none z-10" />
+            <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#FFFFFF] via-[#FFFFFF]/60 to-transparent pointer-events-none z-10" />
           </div>
         ) : (
           <div className="max-w-xl mx-auto px-4 py-4 flex flex-col gap-3">
@@ -195,13 +195,13 @@ export default function NearbyGaragesView({
               <div
                 key={shop.id}
                 onClick={() => setSelectedShopId(shop.id)}
-                className={`p-4 rounded-2xl bg-[#121820] border transition-all cursor-pointer flex items-center gap-3.5 ${
+                className={`p-4 rounded-2xl bg-[#FFFFFF] border transition-all cursor-pointer flex items-center gap-3.5 ${
                   selectedShopId === shop.id
-                    ? "border-[#FF7900] shadow-[0_0_20px_rgba(255,121,0,0.25)]"
-                    : "border-white/10 hover:border-white/20"
+                    ? "border-[#FF7900] shadow-[0_0_20px_rgba(255,121,0,0.15)]"
+                    : "border-[#E2E8F0] hover:border-[#CBD5E1]"
                 }`}
               >
-                <div className="w-16 h-16 rounded-xl overflow-hidden bg-[#0D1117] shrink-0 border border-white/5">
+                <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-[#E2E8F0]">
                   <img
                     src={shop.photos[0] || "/images/workshop-1.jpg"}
                     alt={shop.shopName}
@@ -210,23 +210,30 @@ export default function NearbyGaragesView({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
-                    <h3 className="text-sm font-bold text-white truncate">
+                    <h3 className="text-sm font-bold text-[#0F172A] truncate">
                       {shop.shopName}
                     </h3>
-                    <span className="text-xs font-bold text-[#FF7900] flex items-center gap-1 shrink-0">
+                    <span className="text-xs font-bold text-[#D97706] flex items-center gap-1 shrink-0">
                       <Star size={12} fill="currentColor" /> {shop.rating.toFixed(1)}
                     </span>
                   </div>
-                  <p className="text-xs text-[#A5ADB8] truncate mb-2">
+                  <p className="text-xs text-[#64748B] truncate mb-2">
                     {shop.address}
                   </p>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 border border-white/10 text-white/90">
-                      {shop.distanceKm.toFixed(1)} km
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-[#64748B]">
+                      {shop.distanceKm.toFixed(1)} km away • ~{shop.etaMinutes} min
                     </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold">
-                      Open Now
-                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onBookShop(shop);
+                      }}
+                      className="px-3 py-1 rounded-lg bg-[#FF7900] hover:bg-[#ea580c] text-white text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      Book Repair
+                    </button>
                   </div>
                 </div>
               </div>
@@ -234,10 +241,10 @@ export default function NearbyGaragesView({
           </div>
         )}
 
-        {/* Floating Bottom Selected Garage Card (Exact Match to Screen 4) */}
+        {/* Floating Bottom Selected Garage Card */}
         {activeShop && (
           <div className="fixed bottom-16 inset-x-0 z-30 px-4 pointer-events-none">
-            <div className="max-w-md mx-auto p-4 rounded-2xl bg-[#121820]/95 backdrop-blur-xl border border-white/15 shadow-[0_16px_45px_rgba(0,0,0,0.85)] pointer-events-auto">
+            <div className="max-w-md mx-auto p-4 rounded-2xl bg-white/95 backdrop-blur-xl border border-[#E2E8F0] shadow-xl pointer-events-auto">
               <div className="flex items-center gap-3.5 mb-3.5">
                 {/* Thumbnail */}
                 <div className="w-16 h-16 rounded-xl overflow-hidden bg-[#0D1117] shrink-0 border border-white/10 relative">

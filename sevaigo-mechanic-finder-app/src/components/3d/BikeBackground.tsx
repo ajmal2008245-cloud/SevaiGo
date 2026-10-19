@@ -13,7 +13,7 @@ interface BikeBackgroundProps {
 
 export default function BikeBackground({
   scene = "studio",
-  opacity = 0.5,
+  opacity = 0.08,
   showOverlay = true,
   children,
   className = "",
@@ -27,11 +27,11 @@ export default function BikeBackground({
   };
 
   return (
-    <div className={`relative min-h-screen w-full bg-[#07090C] text-white overflow-x-hidden ${className}`}>
-      {/* Background Layer */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+    <div className={`relative min-h-screen w-full bg-[#FFFFFF] text-[#0F172A] overflow-x-hidden ${className}`}>
+      {/* Background Layer with Clean Pure White */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-[#FFFFFF]">
         {scene === "interactive3d" ? (
-          <div className="absolute inset-0 opacity-40">
+          <div className="absolute inset-0 opacity-15">
             <MotorcycleScene
               interactive={false}
               autoRotate={true}
@@ -44,21 +44,18 @@ export default function BikeBackground({
             className="absolute inset-0 bg-cover bg-center transition-opacity duration-700 ease-out"
             style={{
               backgroundImage: `url('${imageMap[scene]}')`,
-              opacity: opacity,
-              filter: "brightness(0.7) contrast(1.15)",
+              opacity: 0.04,
+              filter: "grayscale(100%)",
             }}
           />
         )}
 
-        {/* Cinematic Vignette & Ambient Glow */}
+        {/* Clean Light Subtle Glow */}
         {showOverlay && (
           <>
-            {/* Deep Dark Automotive Gradient */}
-            <div className="absolute inset-0 bg-gradient-to-b from-[#07090C]/90 via-[#07090C]/75 to-[#07090C] pointer-events-none" />
-
-            {/* Subtle Racing Orange Corner Glow */}
-            <div className="absolute top-0 right-0 w-[450px] h-[450px] bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-[#FF7900]/15 via-transparent to-transparent pointer-events-none blur-3xl" />
-            <div className="absolute bottom-10 left-0 w-[350px] h-[350px] bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-[#FF7900]/10 via-transparent to-transparent pointer-events-none blur-3xl" />
+            <div className="absolute inset-0 bg-[#FFFFFF]/90 pointer-events-none" />
+            <div className="absolute top-0 right-0 w-[450px] h-[450px] bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-[#FF7900]/10 via-transparent to-transparent pointer-events-none blur-3xl" />
+            <div className="absolute bottom-10 left-0 w-[350px] h-[350px] bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-[#FFB020]/8 via-transparent to-transparent pointer-events-none blur-3xl" />
           </>
         )}
       </div>
