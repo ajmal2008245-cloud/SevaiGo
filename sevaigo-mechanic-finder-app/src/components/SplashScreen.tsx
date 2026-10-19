@@ -56,27 +56,26 @@ export default function SplashScreen({ onEnter, autoProceed = true }: SplashScre
   };
 
   useEffect(() => {
-    // 1. Start small (0ms)
-    // 2. Move forward slightly (250ms)
+    // 1. Start small (0ms) -> Move forward slightly (100ms)
     const t1 = setTimeout(() => {
       setPhase("forward");
-    }, 200);
+    }, 100);
 
-    // 3. Settle smoothly into position with pop effect + sound (750ms)
+    // 2. Settle smoothly into position with pop effect + clean sound (450ms)
     const t2 = setTimeout(() => {
       setPhase("settle");
       playClickSound();
-    }, 750);
+    }, 450);
 
-    // 4. Smooth transition out (1450ms)
+    // 3. Smooth transition out (850ms)
     const t3 = setTimeout(() => {
       setPhase("fadeout");
-    }, 1450);
+    }, 850);
 
-    // 5. Complete and navigate to home (1800ms)
+    // 4. Complete and navigate to login/home page immediately (1050ms)
     const t4 = setTimeout(() => {
       onEnter();
-    }, 1800);
+    }, 1050);
 
     return () => {
       clearTimeout(t1);
