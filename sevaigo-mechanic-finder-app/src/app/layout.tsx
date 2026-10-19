@@ -8,6 +8,18 @@ export const metadata: Metadata = {
   description: "Your Bike, Our Priority. Experience premium 3D motorcycle servicing, verified mechanics, live service tracking, and doorstep bike care.",
   applicationName: "SevaiGo",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/icon.png", sizes: "512x512", type: "image/png" },
+      { url: "/images/sevaigo-logo.png", type: "image/png" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+      { url: "/images/sevaigo-logo.png", sizes: "512x512", type: "image/png" },
+    ],
+    shortcut: "/icon.png",
+  },
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "SevaiGo" },
 };
 
