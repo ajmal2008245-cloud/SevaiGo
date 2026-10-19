@@ -144,66 +144,65 @@ export default function RegisterShopFlow({
   // Check if current user already owns a shop from Supabase
   const fetchOwnerShop = useCallback(async () => {
     try {
-      // Direct query to Supabase shops table
-      const { data: supaShops } = await supabase
-        .from('shops')
-        .select('*')
-        .order('created_at', { ascending: false });
-
       const currentPhone = user?.phone || phone;
-      const matched = (supaShops && supaShops.length > 0)
-        ? (currentPhone ? supaShops.find((s: any) => s.phone === currentPhone) : supaShops[0])
-        : null;
-
-      if (matched) {
-        const servicesList = Array.isArray(matched.services) ? matched.services : [];
-        setExistingShop({
-          id: matched.id,
-          shopName: matched.shop_name || "Workshop",
-          ownerName: matched.owner_name || "Mechanic",
-          phone: matched.phone || "",
-          shopPhone: matched.phone || "",
-          address: matched.address || "Chennai",
-          city: "Chennai",
-          latitude: matched.lat || DEMO_LOCATION.latitude,
-          longitude: matched.lng || DEMO_LOCATION.longitude,
-          vehicleTypes: ["2w", "4w"],
-          specializations: servicesList,
-          openTime: "08:00",
-          closeTime: "21:00",
-          photos: ["/images/workshop-1.jpg"],
-          approvalStatus: "approved",
-          availabilityStatus: "available",
-          priceMin: 300,
-          priceMax: 2500,
-          yearsExperience: 5,
-          isVerified: matched.verified ?? true,
-        });
-        setEditDraft({
-          shopName: matched.shop_name || "",
-          ownerName: matched.owner_name || "",
-          phone: matched.phone || "",
-          shopPhone: matched.phone || "",
-          address: matched.address || "",
-          city: "Chennai",
-          pincode: "",
-          openTime: "08:00",
-          closeTime: "21:00",
-          priceMin: "300",
-          priceMax: "2500",
-          availabilityStatus: "free",
-          specializations: servicesList,
-          workingDays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
-          latitude: matched.lat || DEMO_LOCATION.latitude,
-          longitude: matched.lng || DEMO_LOCATION.longitude,
-        });
-      } else {
-        const res = await fetch("/api/owner");
+      if (currentPhone) {
+        const res = await fetch(`/api/register-shop?phone=${encodeURIComponent(currentPhone)}`);
         if (res.ok) {
-          const data = await res.json();
-          if (data.shop) {
-            setExistingShop(data.shop);
+          const json = await res.json().catch(() => null);
+          if (json?.success && json.shop) {
+            const matched = json.shop;
+            const servicesList = Array.isArray(matched.services) ? matched.services : [];
+            setExistingShop({
+              id: matched.id,
+              shopName: matched.shop_name || "Workshop",
+              ownerName: matched.owner_name || "Mechanic",
+              phone: matched.phone || "",
+              shopPhone: matched.phone || "",
+              address: matched.address || "Chennai",
+              city: "Chennai",
+              latitude: matched.lat || DEMO_LOCATION.latitude,
+              longitude: matched.lng || DEMO_LOCATION.longitude,
+              vehicleTypes: ["2w", "4w"],
+              specializations: servicesList,
+              openTime: "08:00",
+              closeTime: "21:00",
+              photos: ["/images/workshop-1.jpg"],
+              approvalStatus: "approved",
+              availabilityStatus: "available",
+              priceMin: 300,
+              priceMax: 2500,
+              yearsExperience: 5,
+              isVerified: matched.verified ?? true,
+            });
+            setEditDraft({
+              shopName: matched.shop_name || "",
+              ownerName: matched.owner_name || "",
+              phone: matched.phone || "",
+              shopPhone: matched.phone || "",
+              address: matched.address || "",
+              city: "Chennai",
+              pincode: "",
+              openTime: "08:00",
+              closeTime: "21:00",
+              priceMin: "300",
+              priceMax: "2500",
+              availabilityStatus: "free",
+              specializations: servicesList,
+              workingDays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+              latitude: matched.lat || DEMO_LOCATION.latitude,
+              longitude: matched.lng || DEMO_LOCATION.longitude,
+            });
+            setLoadingShop(false);
+            return;
           }
+        }
+      }
+
+      const res = await fetch("/api/owner");
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        if (data?.shop) {
+          setExistingShop(data.shop);
         }
       }
     } catch {
@@ -302,33 +301,13 @@ export default function RegisterShopFlow({
       const fullAddress = address.trim() + (city ? `, ${city}` : "") + (pincode ? ` - ${pincode}` : "");
       const servicesList = Array.from(new Set([...vehicleTypes, ...specializations]));
 
-      // 1. Direct insert to Supabase shops table
-      const { data: insertedShop, error: supaErr } = await supabase
-        .from('shops')
-        .insert({
-          shop_name: shopName.trim(),
-          owner_name: ownerName.trim(),
-          phone: shopPhone.trim() || phone.trim(),
-          address: fullAddress,
-          lat: pickedCoords.latitude,
-          lng: pickedCoords.longitude,
-          services: servicesList,
-          verified: true,
-        })
-        .select();
-
-      if (supaErr) {
-        console.error("Supabase shop insert error:", supaErr);
-        throw new Error(supaErr.message || "Failed to save workshop to Supabase.");
-      }
-
       const payload = {
         ownerName: ownerName.trim(),
         phone: phone.trim(),
         email: email.trim() || undefined,
         password: password || undefined,
         shopName: shopName.trim(),
-        shopPhone: (shopPhone.trim() || phone.trim()),
+        shopPhone: shopPhone.trim() || phone.trim(),
         address: address.trim(),
         city: city.trim() || "Chennai",
         pincode: pincode.trim(),
@@ -344,60 +323,68 @@ export default function RegisterShopFlow({
         yearsExperience: Number(yearsExperience) || 5,
         photos: workshopPhotoUrl.trim() ? [workshopPhotoUrl.trim()] : ["/images/workshop-1.jpg"],
         spareParts,
+        businessDoc: businessDoc.trim() || undefined,
       };
 
-      if (businessDoc.trim()) {
-        (payload as any).businessDoc = businessDoc.trim();
+      // Server-side registration call: prevents CORS, network blocks, and credentials exposure
+      const res = await fetch("/api/register-shop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || `Registration failed with status ${res.status}. Please try again.`);
       }
 
-      // Also sync session with backend
-      try {
-        await fetch("/api/mechanics", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-      } catch {}
+      const s = data.shop || {};
+      const returnedServices = Array.isArray(s.services) ? s.services : servicesList;
 
-      if (insertedShop && insertedShop[0]) {
-        const s = insertedShop[0];
-        setExistingShop({
-          id: s.id,
-          shopName: s.shop_name,
-          ownerName: s.owner_name,
-          phone: s.phone,
-          shopPhone: s.phone,
-          address: s.address || fullAddress,
-          city: city.trim() || "Chennai",
-          latitude: s.lat || pickedCoords.latitude,
-          longitude: s.lng || pickedCoords.longitude,
-          vehicleTypes,
-          specializations,
-          openTime,
-          closeTime,
-          photos: workshopPhotoUrl.trim() ? [workshopPhotoUrl.trim()] : ["/images/workshop-1.jpg"],
-          approvalStatus: "approved",
-          availabilityStatus: "available",
-          priceMin: Number(priceMin) || 300,
-          priceMax: Number(priceMax) || 2500,
-          yearsExperience: Number(yearsExperience) || 5,
-          isVerified: true,
-        });
-      }
+      setExistingShop({
+        id: s.id || `shop-${Date.now()}`,
+        shopName: s.shop_name || s.shopName || shopName.trim(),
+        ownerName: s.owner_name || s.ownerName || ownerName.trim(),
+        phone: s.phone || (shopPhone.trim() || phone.trim()),
+        shopPhone: s.phone || (shopPhone.trim() || phone.trim()),
+        address: s.address || fullAddress,
+        city: city.trim() || "Chennai",
+        latitude: s.lat || pickedCoords.latitude,
+        longitude: s.lng || pickedCoords.longitude,
+        vehicleTypes,
+        specializations: returnedServices,
+        openTime,
+        closeTime,
+        photos: workshopPhotoUrl.trim() ? [workshopPhotoUrl.trim()] : ["/images/workshop-1.jpg"],
+        approvalStatus: "approved",
+        availabilityStatus: "available",
+        priceMin: Number(priceMin) || 300,
+        priceMax: Number(priceMax) || 2500,
+        yearsExperience: Number(yearsExperience) || 5,
+        isVerified: true,
+      });
 
-      setSuccessMessage("Workshop registered successfully! Saved to Supabase shops table.");
-      
+      setSuccessMessage("Workshop registered successfully! Your garage has been saved to the database.");
+
       // Refresh current user and owner shop
       try {
         const userRes = await fetch("/api/auth");
         if (userRes.ok) {
-          const udata = await userRes.json();
-          if (udata.user) setUser(udata.user);
+          const udata = await userRes.json().catch(() => null);
+          if (udata?.user) setUser(udata.user);
         }
       } catch {}
+
       await fetchOwnerShop();
-    } catch (err) {
-      setErrorMessage((err as Error).message);
+    } catch (err: any) {
+      console.error("Workshop registration error:", err);
+      const msg = err?.message || "Registration failed. Please check your network and try again.";
+      if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
+        setErrorMessage("Network error: Could not reach the registration server. Please check your internet connection.");
+      } else {
+        setErrorMessage(msg);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -511,30 +498,29 @@ export default function RegisterShopFlow({
     }
   }
 
-  // Save Dashboard Updates directly to Supabase shops table
+  // Save Dashboard Updates via API
   async function handleSaveEdit(e: FormEvent) {
     e.preventDefault();
     setSavingEdit(true);
     setErrorMessage("");
     setSuccessMessage("");
     try {
-      if (existingShop?.id) {
-        const { error: supaErr } = await supabase
-          .from('shops')
-          .update({
-            shop_name: editDraft.shopName,
-            owner_name: editDraft.ownerName,
-            phone: editDraft.shopPhone || editDraft.phone,
+      if (existingShop?.id || editDraft.phone || editDraft.shopPhone) {
+        await fetch("/api/register-shop", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: existingShop?.id,
+            shopName: editDraft.shopName,
+            ownerName: editDraft.ownerName,
+            phone: editDraft.phone,
+            shopPhone: editDraft.shopPhone || editDraft.phone,
             address: editDraft.address,
-            lat: editDraft.latitude,
-            lng: editDraft.longitude,
+            latitude: editDraft.latitude,
+            longitude: editDraft.longitude,
             services: Array.from(new Set([...vehicleTypes, ...editDraft.specializations])),
-          })
-          .eq('id', existingShop.id);
-
-        if (supaErr) {
-          throw new Error(supaErr.message || "Failed to update workshop in Supabase.");
-        }
+          }),
+        }).catch((err) => console.warn("Supabase PATCH warning:", err));
       }
 
       const res = await fetch("/api/owner", {
@@ -560,11 +546,12 @@ export default function RegisterShopFlow({
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (data.shop) setExistingShop(data.shop);
+      if (data?.shop) setExistingShop(data.shop);
       setEditingShop(false);
-      setSuccessMessage("Workshop information updated successfully in Supabase!");
-    } catch (err) {
-      setErrorMessage((err as Error).message);
+      setSuccessMessage("Workshop information updated successfully!");
+    } catch (err: any) {
+      console.error("Workshop update error:", err);
+      setErrorMessage(err?.message || "Could not update workshop details.");
     } finally {
       setSavingEdit(false);
     }
@@ -2213,7 +2200,8 @@ export default function RegisterShopFlow({
                 width: "100%",
                 height: "50px",
                 borderRadius: "12px",
-                backgroundColor: "var(--red)",
+                backgroundColor: submitting ? "var(--red-dark)" : "var(--red)",
+                opacity: submitting ? 0.8 : 1,
                 color: "#ffffff",
                 border: 0,
                 fontSize: "1rem",
@@ -2224,10 +2212,30 @@ export default function RegisterShopFlow({
                 gap: "10px",
                 cursor: submitting ? "not-allowed" : "pointer",
                 boxShadow: "0 6px 20px rgba(227, 81, 75, 0.3)",
+                transition: "opacity 0.2s ease, background-color 0.2s ease",
               }}
             >
-              {submitting ? "Registering Shop..." : "Complete Shop Registration"}
-              <ArrowRight size={18} />
+              {submitting ? (
+                <>
+                  <span
+                    style={{
+                      width: "18px",
+                      height: "18px",
+                      border: "2.5px solid rgba(255, 255, 255, 0.35)",
+                      borderTopColor: "#ffffff",
+                      borderRadius: "50%",
+                      display: "inline-block",
+                      animation: "spin 0.8s linear infinite",
+                    }}
+                  />
+                  <span>Registering Workshop...</span>
+                </>
+              ) : (
+                <>
+                  <span>Complete Shop Registration</span>
+                  <ArrowRight size={18} />
+                </>
+              )}
             </button>
           </form>
         )}
