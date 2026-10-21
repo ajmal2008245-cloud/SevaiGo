@@ -32,12 +32,21 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import MechanicMap from "@/components/MechanicMap";
+import dynamic from "next/dynamic";
 import HelpModal from "@/components/modals/HelpModal";
 import type { PublicUser } from "@/lib/auth";
 import type { MechanicView } from "@/lib/mechanic-shared";
 import { DEMO_LOCATION } from "@/lib/mechanic-shared";
 import { supabase } from "@/lib/supabaseClient";
+
+const MechanicMap = dynamic(() => import("@/components/MechanicMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full bg-[#EAF4FF]/40 animate-pulse flex items-center justify-center text-xs text-[#2F6B73] font-semibold">
+      Loading map...
+    </div>
+  ),
+});
 
 interface CustomerDashboardProps {
   user: PublicUser;
@@ -118,11 +127,14 @@ export default function CustomerDashboard({
   // 3. Spare Parts Selection Option
   const [selectedSpareParts, setSelectedSpareParts] = useState<string[]>([]);
 
-  // 4. Real Registered Mechanics from Supabase
+  // 4. Real Registered Mechanics from Supabase (Cached)
   const [registeredShops, setRegisteredShops] = useState<MechanicView[]>([]);
   const [loadingShops, setLoadingShops] = useState<boolean>(true);
   const [submittingRescueId, setSubmittingRescueId] = useState<string | null>(null);
   const [requestedStatus, setRequestedStatus] = useState<string | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const shopsCacheRef = useRef<Record<string, MechanicView[]>>({});
 
   // 5. Active Live Rescue Tracking State
   const [activeRescue, setActiveRescue] = useState<{
@@ -136,7 +148,7 @@ export default function CustomerDashboard({
     mechanicLng: number;
     etaMinutes: number;
     distanceKm: number;
-    status: "on_the_way" | "arrived" | "completed";
+    status: "pending" | "accepted" | "on_the_way" | "arrived" | "completed";
     step: number;
     requestedAt: number;
   } | null>(null);
@@ -145,116 +157,161 @@ export default function CustomerDashboard({
     if (toastMessage) toastMessage(msg);
   }, [toastMessage]);
 
-  // Load registered mechanics strictly from Supabase
+  // Load registered mechanics strictly from Supabase 'shops' table with indexed bounding box query
   const loadRegisteredMechanics = useCallback(async (userLat: number, userLng: number) => {
+    const cacheKey = `${userLat.toFixed(3)}_${userLng.toFixed(3)}`;
+    if (shopsCacheRef.current[cacheKey]) {
+      setRegisteredShops(shopsCacheRef.current[cacheKey]);
+      setLoadingShops(false);
+      return;
+    }
+
     setLoadingShops(true);
+    setSearchError(null);
+
     try {
+      const radiusKm = 7;
+      const latDelta = radiusKm / 111.0;
+      const lngDelta = radiusKm / (111.0 * Math.cos((userLat * Math.PI) / 180));
+
+      // Query verified mechanics in the 7km bounding box from Supabase
       const { data, error } = await supabase
-        .from("mechanics")
+        .from("shops")
         .select("*")
-        .eq("approval_status", "approved");
+        .eq("verified", true)
+        .gte("lat", userLat - latDelta)
+        .lte("lat", userLat + latDelta)
+        .gte("lng", userLng - lngDelta)
+        .lte("lng", userLng + lngDelta);
 
       if (error) throw error;
 
-      if (data && data.length > 0) {
-        const mapped: MechanicView[] = data.map((item: any) => {
-          const shopLat = Number(item.latitude) || DEMO_LOCATION.latitude;
-          const shopLng = Number(item.longitude) || DEMO_LOCATION.longitude;
-          const dist = distanceKm(userLat, userLng, shopLat, shopLng);
+      if (data) {
+        const mapped: MechanicView[] = data
+          .map((item: any) => {
+            const shopLat = Number(item.lat ?? item.latitude) || DEMO_LOCATION.latitude;
+            const shopLng = Number(item.lng ?? item.longitude) || DEMO_LOCATION.longitude;
+            const dist = distanceKm(userLat, userLng, shopLat, shopLng);
+            const services: string[] = Array.isArray(item.services) ? item.services : [];
+            const vTypes = services.filter((s: string) =>
+              ["2w", "4w", "bike", "car", "auto", "truck"].includes(s.toLowerCase())
+            );
+            if (vTypes.length === 0) vTypes.push("2w", "4w");
 
-          return {
-            id: item.id,
-            slug: item.slug || String(item.id),
-            shopName: item.shop_name || "Mechanic Workshop",
-            ownerName: item.owner_name || "Mechanic Specialist",
-            ownerPhoto: item.owner_photo || "/images/owner-1.jpg",
-            phone: item.phone || "",
-            shopPhone: item.shop_phone || item.phone || "",
-            whatsapp: item.whatsapp || item.phone || "",
-            additionalPhone: item.additional_phone || "",
-            address: item.address || "Tamil Nadu, India",
-            latitude: shopLat,
-            longitude: shopLng,
-            distanceKm: Math.round(dist * 10) / 10,
-            etaMinutes: Math.max(3, Math.round(dist * 3.5)),
-            rating: item.rating ? Number(item.rating) : 4.9,
-            reviewCount: item.total_reviews ? Number(item.total_reviews) : 18,
-            yearsExperience: item.years_experience ? Number(item.years_experience) : 5,
-            isOpen: item.is_open !== false,
-            priceMin: item.price_min ? Number(item.price_min) : 150,
-            priceMax: item.price_max ? Number(item.price_max) : 600,
-            openTime: item.open_time || "08:00 AM",
-            closeTime: item.close_time || "10:00 PM",
-            photos: Array.isArray(item.photos) && item.photos.length > 0 ? item.photos : ["/images/garage-1.jpg"],
-            vehicleTypes: Array.isArray(item.vehicle_types) ? item.vehicle_types : ["2w"],
-            specializations: Array.isArray(item.specializations) ? item.specializations : (Array.isArray(item.services) ? item.services : ["General Repair"]),
-            spareParts: Array.isArray(item.spare_parts) ? item.spare_parts : [],
-            isVerified: true,
-            availabilityStatus: item.availability_status || "available",
-          };
-        });
+            return {
+              id: String(item.id),
+              slug: item.slug || String(item.id),
+              shopName: item.shop_name || "Mechanic Workshop",
+              ownerName: item.owner_name || "Verified Mechanic",
+              ownerPhoto: "/images/owner-1.jpg",
+              phone: item.phone || "",
+              shopPhone: item.phone || "",
+              whatsapp: item.phone || "",
+              additionalPhone: "",
+              address: item.address || "Tamil Nadu, India",
+              latitude: shopLat,
+              longitude: shopLng,
+              distanceKm: Math.round(dist * 10) / 10,
+              etaMinutes: Math.max(2, Math.round(dist * 3.5)),
+              rating: 4.9,
+              reviewCount: 18,
+              yearsExperience: 5,
+              isOpen: true,
+              priceMin: 150,
+              priceMax: 600,
+              openTime: "08:00 AM",
+              closeTime: "10:00 PM",
+              photos: ["/images/garage-1.jpg"],
+              vehicleTypes: vTypes,
+              specializations: services.length > 0 ? services : ["Emergency Roadside Assistance"],
+              spareParts: ["Tubes", "Spark Plugs", "Engine Oil", "Brake Pads"],
+              isVerified: true,
+              availabilityStatus: "available",
+            };
+          })
+          .filter((s) => s.distanceKm <= 7.0)
+          .sort((a, b) => a.distanceKm - b.distanceKm);
 
-        mapped.sort((a, b) => a.distanceKm - b.distanceKm);
+        shopsCacheRef.current[cacheKey] = mapped;
         setRegisteredShops(mapped);
-      } else {
-        const res = await fetch(`/api/mechanics?latitude=${userLat}&longitude=${userLng}&radiusKm=100`);
-        const json = await res.json().catch(() => ({}));
-        if (json.mechanics) {
-          setRegisteredShops(json.mechanics);
-        }
       }
     } catch {
+      // Fast fallback to /api/mechanics endpoint
       try {
-        const res = await fetch(`/api/mechanics?latitude=${userLat}&longitude=${userLng}&radiusKm=100`);
+        const res = await fetch(`/api/mechanics?lat=${userLat}&lng=${userLng}&radius=7`);
         const json = await res.json().catch(() => ({}));
-        if (json.mechanics) {
-          setRegisteredShops(json.mechanics);
-        }
-      } catch {}
+        const list: MechanicView[] = json.shops || json.mechanics || [];
+        const valid7km = list.filter((s) => s.distanceKm <= 7.0);
+        shopsCacheRef.current[cacheKey] = valid7km;
+        setRegisteredShops(valid7km);
+      } catch {
+        setSearchError("Network issue reaching mechanic discovery server. Please tap retry.");
+      }
     } finally {
       setLoadingShops(false);
     }
   }, []);
 
-  // Detect current GPS location
+  // Supabase Real-time: automatically refresh nearby mechanics when a shop registers/updates
+  useEffect(() => {
+    const channel = supabase
+      .channel("customer-shops-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "shops" },
+        () => {
+          shopsCacheRef.current = {};
+          loadRegisteredMechanics(latitude, longitude);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [latitude, longitude, loadRegisteredMechanics]);
+
+  // Detect current GPS location without blocking mechanic discovery
   const detectLocation = useCallback(() => {
     if (!navigator.geolocation) {
-      say("Geolocation not supported by this browser.");
+      setLocationError("Geolocation is not supported by this browser.");
       return;
     }
     setDetectingGps(true);
-    setLocationLabel("Locating your exact device coordinates via GPS...");
+    setLocationError(null);
 
     navigator.geolocation.getCurrentPosition(
-      async (pos) => {
+      (pos) => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
         setLatitude(lat);
         setLongitude(lng);
+        setLocationLabel(`GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+        setDetectingGps(false);
 
-        try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
-          );
-          const data = await res.json();
-          const addr = data.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-          setLocationLabel(addr);
-        } catch {
-          setLocationLabel(`Live GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
-        }
-        setDetectingGps(false);
+        // Instantly trigger mechanic discovery at coordinates without waiting for reverse geocode!
         loadRegisteredMechanics(lat, lng);
-        say("Live GPS location accurately detected.");
+        say("Live GPS coordinates detected!");
+
+        // Reverse geocode in background for address label
+        fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data?.display_name) {
+              setLocationLabel(data.display_name);
+            }
+          })
+          .catch(() => {});
       },
-      () => {
+      (err) => {
         setDetectingGps(false);
-        setLocationLabel("Gobichettipalayam, Erode, Tamil Nadu (Demo GPS)");
-        loadRegisteredMechanics(DEMO_LOCATION.latitude, DEMO_LOCATION.longitude);
-        say("GPS permission denied. Using verified town center coordinates.");
+        setLocationError("GPS location access was denied. Please allow location in your browser or search your breakdown area below.");
+        // Still load current coordinates without freezing
+        loadRegisteredMechanics(latitude, longitude);
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
     );
-  }, [loadRegisteredMechanics, say]);
+  }, [loadRegisteredMechanics, latitude, longitude, say]);
 
   useEffect(() => {
     detectLocation();
@@ -397,37 +454,40 @@ export default function CustomerDashboard({
     }
   };
 
-  // Live Movement Simulation
+  // Genuine Live Rescue Tracking (Poll real status from DB instead of fake simulation)
   useEffect(() => {
-    if (!activeRescue || activeRescue.status === "arrived") return;
+    if (!activeRescue?.breakdownId || activeRescue.status === "completed") return;
 
-    const interval = setInterval(() => {
-      setActiveRescue((prev) => {
-        if (!prev || prev.status === "arrived") return prev;
-        const nextStep = prev.step + 1;
-        const totalSteps = Math.max(8, Math.round(prev.distanceKm * 4));
-        const fraction = Math.min(1, nextStep / totalSteps);
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/breakdowns?id=${encodeURIComponent(activeRescue.breakdownId)}`);
+        if (res.ok) {
+          const json = await res.json();
+          const b = json.breakdown;
+          if (b && b.status) {
+            setActiveRescue((prev) => {
+              if (!prev) return null;
+              const mechLat = b.mechanicLat ?? prev.shop.latitude;
+              const mechLng = b.mechanicLng ?? prev.shop.longitude;
+              const curDist = Math.round(distanceKm(prev.customerLat, prev.customerLng, mechLat, mechLng) * 10) / 10;
+              const curEta = b.etaMinutes ?? Math.max(1, Math.round(curDist * 3.5));
 
-        const newLat = prev.shop.latitude + (prev.customerLat - prev.shop.latitude) * fraction;
-        const newLng = prev.shop.longitude + (prev.customerLng - prev.shop.longitude) * fraction;
-        const remainingDist = Math.max(0.1, Math.round(distanceKm(prev.customerLat, prev.customerLng, newLat, newLng) * 10) / 10);
-        const remainingEta = Math.max(1, Math.round(remainingDist * 3.5));
-
-        const arrived = fraction >= 0.95 || remainingDist <= 0.1;
-        return {
-          ...prev,
-          mechanicLat: Number(newLat.toFixed(6)),
-          mechanicLng: Number(newLng.toFixed(6)),
-          distanceKm: remainingDist,
-          etaMinutes: remainingEta,
-          step: nextStep,
-          status: arrived ? "arrived" : "on_the_way",
-        };
-      });
-    }, 3500);
+              return {
+                ...prev,
+                status: b.status as any,
+                mechanicLat: mechLat,
+                mechanicLng: mechLng,
+                distanceKm: curDist,
+                etaMinutes: curEta,
+              };
+            });
+          }
+        }
+      } catch {}
+    }, 4500);
 
     return () => clearInterval(interval);
-  }, [activeRescue?.status, activeRescue?.customerLat, activeRescue?.customerLng]);
+  }, [activeRescue?.breakdownId, activeRescue?.status]);
 
   // Filter mechanics within 7 km that match vehicle type
   const mechanicsWithin7km = registeredShops.filter((s) => {
@@ -901,6 +961,20 @@ export default function CustomerDashboard({
                   </button>
                 </div>
 
+                {/* GPS Notice / Error Banner if Permission Denied */}
+                {locationError && (
+                  <div className="mt-2.5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-center justify-between gap-2">
+                    <span className="leading-snug">{locationError}</span>
+                    <button
+                      type="button"
+                      onClick={detectLocation}
+                      className="px-2.5 py-1 rounded-lg bg-amber-200 hover:bg-amber-300 font-bold text-amber-950 text-[11px] shrink-0 cursor-pointer transition-colors"
+                    >
+                      Retry GPS
+                    </button>
+                  </div>
+                )}
+
                 {/* Autocomplete Search Input & Action Buttons (Mobile-Responsive to Prevent Overflow) */}
                 <form onSubmit={handleSearchLocation} className="mt-2.5 flex flex-col sm:flex-row gap-2">
                   <div className="relative flex-1">
@@ -1094,6 +1168,23 @@ export default function CustomerDashboard({
                   <RefreshCw size={14} className={loadingShops ? "animate-spin" : ""} />
                 </button>
               </div>
+
+              {/* Compact Error Message with Retry */}
+              {searchError && (
+                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-center justify-between gap-2">
+                  <span>{searchError}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      shopsCacheRef.current = {};
+                      loadRegisteredMechanics(latitude, longitude);
+                    }}
+                    className="px-3 py-1 rounded-lg bg-rose-200 hover:bg-rose-300 font-bold text-rose-950 text-[11px] shrink-0 cursor-pointer transition-colors"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
 
               {/* Loading State */}
               {loadingShops && (

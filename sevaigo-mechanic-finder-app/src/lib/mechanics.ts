@@ -119,12 +119,89 @@ function matchesProblem(specializations: string[], problem?: string): boolean {
 }
 
 export async function getNearbyMechanics(query: MechanicQuery): Promise<MechanicView[]> {
+  const radius = Math.min(Math.max(query.radiusKm ?? 7, 0.5), 100);
+  const term = query.search?.trim().toLowerCase();
+  const userLat = query.latitude;
+  const userLng = query.longitude;
+
+  // 1. Primary: Fast bounding box query on Supabase 'shops'
   try {
-    await ensureSeed();
+    const latDelta = radius / 111.0;
+    const lngDelta = radius / (111.0 * Math.cos((userLat * Math.PI) / 180));
+
+    const { data: supaRows, error: supaErr } = await supabase
+      .from("shops")
+      .select("*")
+      .eq("verified", true)
+      .gte("lat", userLat - latDelta)
+      .lte("lat", userLat + latDelta)
+      .gte("lng", userLng - lngDelta)
+      .lte("lng", userLng + lngDelta);
+
+    if (!supaErr && supaRows && supaRows.length > 0) {
+      const supaShops: MechanicView[] = supaRows
+        .map((row: any) => {
+          const lat = Number(row.lat ?? row.latitude ?? userLat);
+          const lng = Number(row.lng ?? row.longitude ?? userLng);
+          const dist = distanceKm(userLat, userLng, lat, lng);
+          const rawServices: string[] = Array.isArray(row.services) ? row.services : [];
+          const vTypes = rawServices.filter((s: string) =>
+            ["2w", "4w", "truck", "bus", "Bike", "Car", "Auto", "bike", "car"].includes(s)
+          );
+          if (vTypes.length === 0) vTypes.push("2w", "4w");
+
+          return {
+            id: String(row.id),
+            slug: String(row.id),
+            shopName: row.shop_name || row.shopName || "Mechanic Workshop",
+            ownerName: row.owner_name || row.ownerName || "Verified Specialist",
+            ownerPhoto: "/images/owner-1.jpg",
+            phone: row.phone || "",
+            shopPhone: row.phone || "",
+            whatsapp: row.phone || "",
+            additionalPhone: "",
+            address: row.address || "Tamil Nadu, India",
+            city: "Tamil Nadu",
+            latitude: lat,
+            longitude: lng,
+            vehicleTypes: vTypes,
+            specializations: rawServices.length > 0 ? rawServices : ["General service", "Puncture", "Battery", "Engine"],
+            openTime: "08:00",
+            closeTime: "21:00",
+            rating: 4.9,
+            reviewCount: 18,
+            photos: ["/images/workshop-1.jpg"],
+            isVerified: Boolean(row.verified ?? true),
+            availabilityStatus: "available",
+            priceMin: 250,
+            priceMax: 2000,
+            yearsExperience: 5,
+            distanceKm: Math.round(dist * 10) / 10,
+            etaMinutes: Math.max(2, Math.round(dist * 3.5 + 2)),
+            isOpen: true,
+            isRegisteredOwner: true,
+          };
+        })
+        .filter((shop: MechanicView) => shop.distanceKm <= radius)
+        .filter((shop: MechanicView) => matchesVehicleType(shop.vehicleTypes, query.vehicleType))
+        .filter((shop: MechanicView) => matchesProblem(shop.specializations, query.problem))
+        .filter(
+          (shop: MechanicView) =>
+            !term ||
+            `${shop.shopName} ${shop.address} ${shop.specializations.join(" ")}`.toLowerCase().includes(term)
+        );
+
+      supaShops.sort((a, b) => a.distanceKm - b.distanceKm);
+
+      if (supaShops.length > 0) {
+        return supaShops;
+      }
+    }
   } catch (err) {
-    console.warn("[SevaiGo] ensureSeed safe note:", err);
+    console.warn("[SevaiGo] Supabase bounding box query error, checking local DB:", err);
   }
 
+  // 2. Secondary fallback: Local DB verified mechanics
   let rows: MechanicRow[] = [];
   try {
     if (query.includeUnapproved) {
@@ -132,152 +209,27 @@ export async function getNearbyMechanics(query: MechanicQuery): Promise<Mechanic
     } else {
       rows = (await db.select().from(mechanics).where(and(
         eq(mechanics.isVerified, true),
-        eq(mechanics.approvalStatus, "approved"),
+        eq(mechanics.approvalStatus, "approved")
       ))) as MechanicRow[];
     }
   } catch (err) {
-    console.warn("[SevaiGo] Mechanics query failed, falling back to baseline verified shops:", err);
+    console.warn("[SevaiGo] Local DB query note:", err);
   }
-
-  if (rows.length === 0 && INITIAL_MECHANICS.length > 0) {
-    rows = INITIAL_MECHANICS.map((m: any) => ({
-      id: m.id,
-      slug: m.slug,
-      ownerUserId: m.owner_user_id ?? null,
-      shopName: m.shop_name,
-      ownerName: m.owner_name,
-      ownerPhoto: m.owner_photo || "/images/owner-1.jpg",
-      phone: m.phone,
-      address: m.address,
-      city: m.city ?? "Chennai",
-      pincode: m.pincode ?? null,
-      shopPhone: m.shop_phone ?? m.phone,
-      latitude: Number(m.latitude),
-      longitude: Number(m.longitude),
-      vehicleTypes: m.vehicle_types ?? ["2w", "4w"],
-      specializations: m.specializations ?? ["General service"],
-      workingDays: m.working_days ?? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
-      openTime: m.open_time || "08:00",
-      closeTime: m.close_time || "21:00",
-      rating: Number(m.rating || 4.8),
-      reviewCount: Number(m.review_count || 14),
-      photos: m.photos ?? ["/images/workshop-1.jpg"],
-      isVerified: Boolean(m.is_verified ?? true),
-      approvalStatus: m.approval_status || "approved",
-      availabilityStatus: m.availability_status || "available",
-      priceMin: Number(m.price_min || 250),
-      priceMax: Number(m.price_max || 2500),
-      yearsExperience: Number(m.years_experience || 5),
-      businessDoc: m.business_doc ?? null,
-      spareParts: m.spare_parts ?? ["Tubes", "Spark Plugs", "Engine Oil", "Brake Pads"],
-      isOnline: m.is_online ?? true,
-      createdAt: new Date(m.created_at || Date.now()),
-    })) as MechanicRow[];
-  }
-
-  const radius = Math.min(Math.max(query.radiusKm ?? 5, 0.5), 100);
-  const term = query.search?.trim().toLowerCase();
 
   const shops: MechanicView[] = rows
     .map((row: MechanicRow) => toMechanicView(row, query.latitude, query.longitude))
     .filter((shop: MechanicView) => shop.distanceKm <= radius)
     .filter((shop: MechanicView) => matchesVehicleType(shop.vehicleTypes, query.vehicleType))
     .filter((shop: MechanicView) => matchesProblem(shop.specializations, query.problem))
-    .filter((shop: MechanicView) => !term || `${shop.shopName} ${shop.address} ${shop.specializations.join(" ")}`.toLowerCase().includes(term))
+    .filter(
+      (shop: MechanicView) =>
+        !term ||
+        `${shop.shopName} ${shop.address} ${shop.specializations.join(" ")}`.toLowerCase().includes(term)
+    )
     .filter((shop: MechanicView) => !query.openOnly || shop.isOpen)
     .filter((shop: MechanicView) => !query.availableOnly || shop.availabilityStatus === "available");
 
-  shops.sort((a: MechanicView, b: MechanicView) => {
-    // Prioritize available mechanics by default
-    const scoreA = (a.availabilityStatus === "available" ? 2 : a.availabilityStatus === "busy" ? 1 : 0);
-    const scoreB = (b.availabilityStatus === "available" ? 2 : b.availabilityStatus === "busy" ? 1 : 0);
+  shops.sort((a: MechanicView, b: MechanicView) => a.distanceKm - b.distanceKm);
 
-    if (query.sort === "rating") return b.rating - a.rating || a.distanceKm - b.distanceKm;
-    if (query.sort === "open") return Number(b.isOpen) - Number(a.isOpen) || a.distanceKm - b.distanceKm;
-    if (query.sort === "availability") return scoreB - scoreA || a.distanceKm - b.distanceKm;
-    
-    // Default: available first, then closest distance
-    if (scoreB !== scoreA) return scoreB - scoreA;
-    return a.distanceKm - b.distanceKm;
-  });
-
-  // Query live shops directly from Supabase
-  try {
-    const { data: supaRows } = await supabase.from('shops').select('*').order('created_at', { ascending: false });
-    if (supaRows && supaRows.length > 0) {
-      const supaShops: MechanicView[] = supaRows.map((row: any) => {
-        const lat = Number(row.lat ?? row.latitude ?? query.latitude);
-        const lng = Number(row.lng ?? row.longitude ?? query.longitude);
-        const dist = distanceKm(query.latitude, query.longitude, lat, lng);
-        const services: string[] = Array.isArray(row.services) ? row.services : [];
-        const vTypes = services.filter((s: string) => ['2w', '4w', 'truck', 'bus', 'Bike', 'Car', 'Auto'].includes(s));
-        if (vTypes.length === 0) vTypes.push('2w', '4w', 'Bike', 'Car');
-
-        return {
-          id: String(row.id),
-          slug: String(row.id),
-          shopName: row.shop_name || row.shopName || 'Mechanic Workshop',
-          ownerName: row.owner_name || row.ownerName || 'Mechanic',
-          ownerPhoto: '/images/owner-1.jpg',
-          phone: row.phone || '',
-          shopPhone: row.phone || '',
-          address: row.address || 'Chennai',
-          city: 'Chennai',
-          latitude: lat,
-          longitude: lng,
-          vehicleTypes: vTypes,
-          specializations: services.length > 0 ? services : ['General service', 'Puncture', 'Battery', 'Engine'],
-          openTime: '08:00',
-          closeTime: '21:00',
-          rating: 4.8,
-          reviewCount: 14,
-          photos: ['/images/workshop-1.jpg'],
-          isVerified: Boolean(row.verified ?? true),
-          availabilityStatus: 'available',
-          priceMin: 250,
-          priceMax: 2000,
-          yearsExperience: 5,
-          distanceKm: Math.round(dist * 10) / 10,
-          etaMinutes: Math.max(2, Math.round(dist * 3.5 + 2)),
-          isOpen: true,
-          isRegisteredOwner: true,
-        };
-      })
-      .filter((shop: MechanicView) => shop.distanceKm <= Math.max(radius, 20))
-      .filter((shop: MechanicView) => matchesVehicleType(shop.vehicleTypes, query.vehicleType))
-      .filter((shop: MechanicView) => matchesProblem(shop.specializations, query.problem));
-
-      const combined = supaShops.length > 0
-        ? [...supaShops, ...shops.filter((s) => !supaShops.some((sup) => sup.id === s.id || (sup.phone && sup.phone === s.phone)))]
-        : shops;
-
-      const seenIds = new Set<string>();
-      const seenPhones = new Set<string>();
-      const uniqueShops: MechanicView[] = [];
-      for (const s of combined) {
-        const cleanPhone = (s.phone || "").replace(/\D/g, "").slice(-10);
-        if (seenIds.has(s.id)) continue;
-        if (cleanPhone && seenPhones.has(cleanPhone)) continue;
-        seenIds.add(s.id);
-        if (cleanPhone) seenPhones.add(cleanPhone);
-        uniqueShops.push(s);
-      }
-      return uniqueShops;
-    }
-  } catch (err) {
-    // ignore
-  }
-
-  const seenIds = new Set<string>();
-  const seenPhones = new Set<string>();
-  const uniqueShops: MechanicView[] = [];
-  for (const s of shops) {
-    const cleanPhone = (s.phone || "").replace(/\D/g, "").slice(-10);
-    if (seenIds.has(s.id)) continue;
-    if (cleanPhone && seenPhones.has(cleanPhone)) continue;
-    seenIds.add(s.id);
-    if (cleanPhone) seenPhones.add(cleanPhone);
-    uniqueShops.push(s);
-  }
-  return uniqueShops;
+  return shops;
 }

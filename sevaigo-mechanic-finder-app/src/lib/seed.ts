@@ -2,7 +2,7 @@ import { db, initDb } from "@/db";
 import { breakdowns, mechanics, users } from "@/db/schema";
 import { hashPassword } from "@/lib/auth";
 import { INITIAL_USERS, INITIAL_MECHANICS, INITIAL_BREAKDOWNS } from "@/db/initialData";
-import { count } from "drizzle-orm";
+import { count, inArray } from "drizzle-orm";
 
 let seedPromise: Promise<void> | null = null;
 
@@ -99,40 +99,15 @@ export async function ensureSeed() {
             console.warn("[SevaiGo Seed] Mechanic insert skipped:", m.shop_name, e);
           }
         }
-
-        // Seed initial breakdowns
-        for (const b of INITIAL_BREAKDOWNS) {
-          try {
-            await db
-              .insert(breakdowns)
-              .values({
-                id: b.id,
-                userId: b.user_id ?? null,
-                mechanicId: b.mechanic_id,
-                issue: b.issue || "Roadside assistance",
-                status: b.status || "pending",
-                vehicleType: b.vehicle_type ?? null,
-                userName: b.user_name ?? null,
-                userPhone: b.user_phone ?? null,
-                address: b.address ?? null,
-                notes: b.notes ?? null,
-                photoUrl: b.photo_url ?? null,
-                spareParts: b.spare_parts ?? null,
-                latitude: b.latitude ? Number(b.latitude) : null,
-                longitude: b.longitude ? Number(b.longitude) : null,
-                mechanicLat: b.mechanic_lat ? Number(b.mechanic_lat) : null,
-                mechanicLng: b.mechanic_lng ? Number(b.mechanic_lng) : null,
-                etaMinutes: b.eta_minutes ? Number(b.eta_minutes) : null,
-                action: b.action || "called",
-                createdAt: new Date(b.created_at),
-                updatedAt: new Date(b.updated_at),
-              })
-              .onConflictDoNothing();
-          } catch (e) {
-            console.warn("[SevaiGo Seed] Breakdown insert skipped:", b.id, e);
-          }
-        }
       }
+
+      // Clean up any legacy seeded fake demo breakdowns to ensure zero fake requests
+      try {
+        if (INITIAL_BREAKDOWNS && INITIAL_BREAKDOWNS.length > 0) {
+          const fakeIds = INITIAL_BREAKDOWNS.map((b: any) => b.id);
+          await db.delete(breakdowns).where(inArray(breakdowns.id, fakeIds)).catch(() => {});
+        }
+      } catch {}
     })().catch((error) => {
       seedPromise = null;
       console.error("[SevaiGo Seed] Warning during database seed:", error);

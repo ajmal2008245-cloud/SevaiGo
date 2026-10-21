@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import {
   ArrowLeft, ArrowRight, ArrowUpRight, Bell, Bike, Calendar, Camera, CarFront, Check, CheckCircle2, ChevronDown,
   ChevronRight, Clock3, Compass, Copy, Heart, HelpCircle, Layers, LifeBuoy, LocateFixed, LogOut, MapPin,
@@ -10,22 +11,25 @@ import {
   Wrench, X, Zap,
 } from "lucide-react";
 
-import MotorcycleScene from "@/components/3d/MotorcycleScene";
-import BikeBackground from "@/components/3d/BikeBackground";
-import CinematicHero from "@/components/CinematicHero";
-import SplashScreen from "@/components/SplashScreen";
-import LoginView from "@/components/LoginView";
-import NearbyGaragesView from "@/components/NearbyGaragesView";
-import ServiceBookingFlow from "@/components/ServiceBookingFlow";
-import TrackServiceView from "@/components/TrackServiceView";
-import LiveTrackingView from "@/components/LiveTrackingView";
-import ProfileView from "@/components/ProfileView";
+const LoginView = dynamic(() => import("@/components/LoginView"), { ssr: false });
+const CustomerDashboard = dynamic(() => import("@/components/CustomerDashboard"), { ssr: false });
+const RegisterShopFlow = dynamic(() => import("@/components/RegisterShopFlow"), { ssr: false });
+const MechanicMap = dynamic(() => import("@/components/MechanicMap"), { ssr: false });
+import type { MapLocation } from "@/components/MechanicMap";
+
+const BikeBackground = dynamic(() => import("@/components/3d/BikeBackground"), { ssr: false });
+const MotorcycleScene = dynamic(() => import("@/components/3d/MotorcycleScene"), { ssr: false });
+const CinematicHero = dynamic(() => import("@/components/CinematicHero"), { ssr: false });
+const SplashScreen = dynamic(() => import("@/components/SplashScreen"), { ssr: false });
+const NearbyGaragesView = dynamic(() => import("@/components/NearbyGaragesView"), { ssr: false });
+const ServiceBookingFlow = dynamic(() => import("@/components/ServiceBookingFlow"), { ssr: false });
+const TrackServiceView = dynamic(() => import("@/components/TrackServiceView"), { ssr: false });
+const LiveTrackingView = dynamic(() => import("@/components/LiveTrackingView"), { ssr: false });
+const ProfileView = dynamic(() => import("@/components/ProfileView"), { ssr: false });
+
 import SparePartsModal from "@/components/modals/SparePartsModal";
 import OffersModal from "@/components/modals/OffersModal";
 import HelpModal from "@/components/modals/HelpModal";
-import MechanicMap, { type MapLocation } from "@/components/MechanicMap";
-import RegisterShopFlow from "@/components/RegisterShopFlow";
-import CustomerDashboard from "@/components/CustomerDashboard";
 import ShopCard from "@/components/ShopCard";
 import ShopDetail, { type ShopReview } from "@/components/ShopDetail";
 
@@ -93,9 +97,40 @@ export default function SevaiGoApp({
   initialUser: PublicUser | null;
 }) {
   const [view, setView] = useState<View>("home");
-  const [user, setUser] = useState<PublicUser | null>(initialUser);
+  const [user, setUser] = useState<PublicUser | null>(() => {
+    if (initialUser) return initialUser;
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("isLoggedIn");
+        const phone = localStorage.getItem("userPhone");
+        const role = (localStorage.getItem("userRole") as any) || "customer";
+        const name = localStorage.getItem("userName");
+        if (stored === "true" && phone) {
+          return {
+            id: `u-${phone}`,
+            name: name || (role === "mechanic" ? `Mechanic ${phone.slice(-4)}` : `Rider ${phone.slice(-4)}`),
+            phone,
+            email: `${phone}@sevaigo.local`,
+            role,
+          };
+        }
+      } catch {}
+    }
+    return null;
+  });
+
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
+    if (initialUser) return true;
+    if (typeof window !== "undefined") {
+      try {
+        return localStorage.getItem("isLoggedIn") === "true";
+      } catch {}
+    }
+    return false;
+  });
+
   const [shops, setShops] = useState<MechanicView[]>(initialShops);
-  const [location, setLocation] = useState<MapLocation>({ ...DEMO_LOCATION, label: "Detecting GPS...", source: "gps" });
+  const [location, setLocation] = useState<any>({ ...DEMO_LOCATION, label: "Detecting GPS...", source: "gps" });
   const [language, setLanguage] = useState<Language>("en");
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -108,9 +143,6 @@ export default function SevaiGoApp({
   const [loadingShops, setLoadingShops] = useState(false);
   const [toast, setToast] = useState("");
 
-  // Authentication State: First time starts logged out for phone + OTP login
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
-  const [checkingAuth, setCheckingAuth] = useState<boolean>(true);
   const [userPhone, setUserPhone] = useState(initialUser?.phone || "");
   const [userName, setUserName] = useState(initialUser?.name || "");
 
@@ -118,24 +150,10 @@ export default function SevaiGoApp({
   const [sparePartsOpen, setSparePartsOpen] = useState(false);
   const [offersOpen, setOffersOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [activeBooking, setActiveBooking] = useState<any>({
-    id: "SG#45872",
-    referenceId: "SG#45872",
-    bike: "Yamaha FZ",
-    service: "General Service",
-    price: 499,
-    date: "26 Oct 2026",
-    status: "In Progress",
-    garageName: "Rider's Garage & Speed Care",
-    mechanic: {
-      name: "Ravi Kumar",
-      phone: "+91 98765 43210",
-      role: "Senior Master Technician",
-    },
-  });
+  const [activeBooking, setActiveBooking] = useState<any>(null);
 
   // Rescue & Garage State
-  const [radiusKm, setRadiusKm] = useState(5);
+  const [radiusKm, setRadiusKm] = useState(7);
   const [rescueVehicle, setRescueVehicle] = useState<"bike" | "car" | "auto" | "other">("bike");
   const [rescueProblem, setRescueProblem] = useState("Puncture");
   const [callingShop, setCallingShop] = useState<MechanicView | null>(null);
@@ -153,22 +171,7 @@ export default function SevaiGoApp({
   const [favoriteShops, setFavoriteShops] = useState<MechanicView[]>([]);
   const [vehicles, setVehicles] = useState<VehicleItem[]>([]);
   const [breakdowns, setBreakdowns] = useState<BreakdownItem[]>([]);
-  const [notices, setNotices] = useState<NoticeItem[]>([
-    {
-      id: "n-1",
-      title: "Service Underway",
-      message: "Ravi Kumar has completed the diagnosis for your Yamaha FZ.",
-      isRead: false,
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: "n-2",
-      title: "Monsoon Bike Care Offer",
-      message: "Use code FREECHAIN for complimentary chain cleaning.",
-      isRead: false,
-      createdAt: new Date(Date.now() - 86400000).toISOString(),
-    },
-  ]);
+  const [notices, setNotices] = useState<NoticeItem[]>([]);
   const [ownerShop, setOwnerShop] = useState<OwnerShop | null>(null);
   const [pendingShops, setPendingShops] = useState<PendingShop[]>([]);
   const [reviews, setReviews] = useState<ShopReview[]>([]);
@@ -219,7 +222,6 @@ export default function SevaiGoApp({
         }
       }
     } catch {}
-    setCheckingAuth(false);
   }, []);
 
   const handleLoginSuccess = (phone: string, inputName?: string, role: "customer" | "mechanic" = "customer") => {
@@ -665,19 +667,7 @@ export default function SevaiGoApp({
   const selectedShop = shops.find((s) => s.id === selectedId) || null;
   const unreadCount = notices.filter((n) => !n.isRead).length;
 
-  // 1. Splash Loader while verifying auth
-  if (checkingAuth) {
-    return (
-      <div className="min-h-screen w-full bg-[#F4FAFC] flex flex-col items-center justify-center font-['DM_Sans',sans-serif]">
-        <div className="w-16 h-16 rounded-2xl bg-[#EAF4FF] border border-[#BFDBFE] flex items-center justify-center mb-3 shadow-xs">
-          <Image src="/images/sevaigo-logo.png" alt="SevaiGo" width={42} height={42} priority />
-        </div>
-        <div className="w-6 h-6 border-2 border-[#2F6B73] border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  // 2. FIRST TIME / SIGNED OUT VIEW: Exactly 2 login options (Customer Login & Mechanic Login)
+  // 1. FIRST TIME / SIGNED OUT VIEW: Exactly 2 login options (Customer Login & Mechanic Login)
   if (!isLoggedIn || !user) {
     return (
       <LoginView

@@ -1,8 +1,9 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte } from "drizzle-orm";
 import { db } from "@/db";
 import { breakdowns, mechanics, notifications } from "@/db/schema";
 import { apiError, cleanText } from "@/lib/api";
 import { getSessionUser } from "@/lib/auth";
+import { supabase } from "@/lib/supabaseClient";
 
 export const dynamic = "force-dynamic";
 
@@ -73,6 +74,38 @@ export async function GET(request: Request) {
       });
     }
 
+    // Also check Supabase shops if not found locally
+    if (!targetShop && (paramShopId || cleanDigits.length >= 10)) {
+      try {
+        let query = supabase.from("shops").select("*");
+        if (paramShopId) {
+          query = query.eq("id", paramShopId);
+        }
+        const { data: sRows } = await query.limit(5);
+        if (sRows && sRows.length > 0) {
+          const matched = sRows.find((s: any) => {
+            if (paramShopId && String(s.id) === paramShopId) return true;
+            const p = (s.phone || "").replace(/\D/g, "");
+            return cleanDigits.length >= 10 && p.endsWith(cleanDigits.slice(-10));
+          });
+          if (matched) {
+            targetShop = {
+              id: String(matched.id),
+              shopName: matched.shop_name,
+              phone: matched.phone,
+              address: matched.address,
+              latitude: Number(matched.lat),
+              longitude: Number(matched.lng),
+            };
+          }
+        }
+      } catch {}
+    }
+
+    if (!targetShop) {
+      return Response.json({ breakdowns: [], shop: null });
+    }
+
     try {
       const items = await db.select({
         id: breakdowns.id,
@@ -96,14 +129,14 @@ export async function GET(request: Request) {
         createdAt: breakdowns.createdAt,
         updatedAt: breakdowns.updatedAt,
       }).from(breakdowns)
-        .innerJoin(mechanics, eq(breakdowns.mechanicId, mechanics.id))
-        .where(targetShop ? eq(breakdowns.mechanicId, targetShop.id) : undefined)
+        .leftJoin(mechanics, eq(breakdowns.mechanicId, mechanics.id))
+        .where(eq(breakdowns.mechanicId, targetShop.id))
         .orderBy(desc(breakdowns.createdAt))
         .limit(50);
 
-      return Response.json({ breakdowns: items, shop: targetShop || null });
+      return Response.json({ breakdowns: items, shop: targetShop });
     } catch (dbErr) {
-      return Response.json({ breakdowns: [], shop: targetShop || null });
+      return Response.json({ breakdowns: [], shop: targetShop });
     }
   }
 
@@ -149,9 +182,21 @@ export async function POST(request: Request) {
   let [shop] = await db.select().from(mechanics).where(eq(mechanics.id, rawMechanicId)).limit(1).catch(() => []);
   
   if (!shop) {
-    // Fallback: match by first available mechanic if custom ID
-    const [firstShop] = await db.select().from(mechanics).limit(1).catch(() => []);
-    shop = firstShop;
+    // Check Supabase 'shops' table
+    try {
+      const { data: supaShop } = await supabase.from("shops").select("*").eq("id", rawMechanicId).limit(1);
+      if (supaShop && supaShop[0]) {
+        shop = {
+          id: String(supaShop[0].id),
+          shopName: supaShop[0].shop_name,
+          phone: supaShop[0].phone,
+          address: supaShop[0].address,
+          latitude: Number(supaShop[0].lat),
+          longitude: Number(supaShop[0].lng),
+          ownerUserId: null,
+        };
+      }
+    } catch {}
   }
 
   const user = await getSessionUser();
@@ -171,6 +216,28 @@ export async function POST(request: Request) {
 
   const targetMechId = shop ? shop.id : rawMechanicId;
 
+  // Deduplication guard: check if duplicate rescue was submitted in last 30 seconds
+  if (action === "requested" && userPhone) {
+    try {
+      const thirtySecondsAgo = new Date(Date.now() - 30000);
+      const [existingRecent] = await db.select().from(breakdowns).where(
+        and(
+          eq(breakdowns.mechanicId, targetMechId),
+          eq(breakdowns.userPhone, userPhone),
+          gte(breakdowns.createdAt, thirtySecondsAgo)
+        )
+      ).limit(1);
+
+      if (existingRecent) {
+        return Response.json({
+          success: true,
+          breakdown: existingRecent,
+          message: "Rescue request already registered and active.",
+        }, { status: 200 });
+      }
+    } catch {}
+  }
+
   const [record] = await db.insert(breakdowns).values({
     userId: user?.id || null,
     mechanicId: targetMechId,
@@ -188,13 +255,29 @@ export async function POST(request: Request) {
     longitude: Number.isFinite(lng) && lng >= -180 && lng <= 180 ? lng : null,
   }).returning().catch(() => []);
 
+  // Sync to Supabase rescue_requests for real-time reach
+  if (action === "requested") {
+    try {
+      await supabase.from("rescue_requests").insert({
+        user_phone: userPhone,
+        vehicle_type: vehicleType,
+        problem: issue,
+        lat: Number.isFinite(lat) && lat >= -90 && lat <= 90 ? lat : 13.0827,
+        lng: Number.isFinite(lng) && lng >= -180 && lng <= 180 ? lng : 80.2707,
+        status: "pending",
+      });
+    } catch (supaErr) {
+      console.warn("[Breakdowns API] Supabase rescue_requests sync note:", supaErr);
+    }
+  }
+
   // If request is made and workshop has an owner, notify the shop owner
-  if (action === "requested" && shop.ownerUserId) {
+  if (action === "requested" && shop?.ownerUserId) {
     await db.insert(notifications).values({
       userId: shop.ownerUserId,
       title: "🚨 New Rescue Request",
       message: `${userName} requested assistance for ${vehicleType.toUpperCase()} (${issue}). Contact: ${userPhone || "Not provided"}.`,
-    });
+    }).catch(() => {});
   }
 
   return Response.json({

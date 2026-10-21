@@ -12,15 +12,19 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   try {
     const params = new URL(request.url).searchParams;
-    const lat = Number(params.get("lat"));
-    const lng = Number(params.get("lng"));
-    const latitude = Number.isFinite(lat) && lat >= -90 && lat <= 90 && params.has("lat") ? lat : DEMO_LOCATION.latitude;
-    const longitude = Number.isFinite(lng) && lng >= -180 && lng <= 180 && params.has("lng") ? lng : DEMO_LOCATION.longitude;
+    const rawLat = params.get("lat") ?? params.get("latitude");
+    const rawLng = params.get("lng") ?? params.get("longitude");
+    const lat = Number(rawLat);
+    const lng = Number(rawLng);
+    const latitude = Number.isFinite(lat) && lat >= -90 && lat <= 90 && rawLat !== null ? lat : DEMO_LOCATION.latitude;
+    const longitude = Number.isFinite(lng) && lng >= -180 && lng <= 180 && rawLng !== null ? lng : DEMO_LOCATION.longitude;
+    const radius = Number(params.get("radius") ?? params.get("radiusKm")) || 7;
+
     const shops = await getNearbyMechanics({
       latitude,
       longitude,
-      radiusKm: Number(params.get("radius")) || 5,
-      vehicleType: params.get("vehicle") || "all",
+      radiusKm: radius,
+      vehicleType: params.get("vehicle") || params.get("vehicleType") || "all",
       problem: params.get("problem") || undefined,
       search: params.get("search") || "",
       sort: params.get("sort") || "distance",
@@ -28,10 +32,17 @@ export async function GET(request: Request) {
       availableOnly: params.get("available") === "true",
       includeUnapproved: params.get("includeUnapproved") === "true",
     });
-    return Response.json({ shops, latitude, longitude }, { headers: { "Cache-Control": "no-store" } });
+
+    return Response.json(
+      { success: true, shops, mechanics: shops, latitude, longitude },
+      { headers: { "Cache-Control": "public, max-age=15, stale-while-revalidate=45" } }
+    );
   } catch (err) {
     console.error("[SevaiGo Mechanics API] GET error:", err);
-    return Response.json({ shops: [], latitude: DEMO_LOCATION.latitude, longitude: DEMO_LOCATION.longitude }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json(
+      { success: false, shops: [], mechanics: [], latitude: DEMO_LOCATION.latitude, longitude: DEMO_LOCATION.longitude },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   }
 }
 
