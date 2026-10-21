@@ -28,6 +28,8 @@ export type MechanicView = {
   city?: string | null;
   pincode?: string | null;
   shopPhone?: string | null;
+  whatsapp?: string | null;
+  additionalPhone?: string | null;
   workingDays?: string[] | null;
   isRegisteredOwner?: boolean;
   spareParts?: string[];

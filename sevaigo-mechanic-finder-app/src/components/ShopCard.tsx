@@ -23,7 +23,7 @@ export default function ShopCard({ shop, language, isSaved, onOpen, onFavorite, 
   const statusText = status === "closed" ? t(language, "currentlyClosed") : status === "busy" ? t(language, "busyNow") : t(language, "freeNow");
   return (
     <article
-      className="shop-card group relative p-3.5 rounded-2xl bg-[#FFFFFF] hover:bg-[#F8FAFC] border border-[#E2E8F0] hover:border-[#FF7900]/60 shadow-xs transition-all duration-300 cursor-pointer flex flex-col justify-between"
+      className="shop-card group relative p-3.5 rounded-2xl bg-white hover:bg-[#F8FAFC] border border-[#D5DEE5] hover:border-[#3B82F6]/60 shadow-xs transition-all duration-300 cursor-pointer flex flex-col justify-between"
       onClick={() => onOpen(shop)}
       onKeyDown={(event) => { if (event.key === "Enter") onOpen(shop); }}
       tabIndex={0}
@@ -32,7 +32,7 @@ export default function ShopCard({ shop, language, isSaved, onOpen, onFavorite, 
     >
       <div className="flex gap-3.5">
         {/* Workshop Image */}
-        <div className="w-20 h-24 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-[#E2E8F0] relative">
+        <div className="w-20 h-24 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-[#D5DEE5] relative">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
@@ -49,11 +49,11 @@ export default function ShopCard({ shop, language, isSaved, onOpen, onFavorite, 
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2 mb-1">
             <div className="min-w-0">
-              <h3 className="text-sm font-bold text-[#0F172A] group-hover:text-[#FF7900] transition-colors truncate">
+              <h3 className="text-sm font-bold text-[#172033] group-hover:text-[#2F6B73] transition-colors truncate">
                 {shop.shopName}
               </h3>
               {shop.isRegisteredOwner && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#059669] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 mt-0.5">
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#166534] bg-[#DCFCE7] px-1.5 py-0.5 rounded-full border border-[#86EFAC] mt-0.5">
                   <ShieldCheck size={11} strokeWidth={2.4} /> Verified Workshop
                 </span>
               )}
@@ -61,7 +61,7 @@ export default function ShopCard({ shop, language, isSaved, onOpen, onFavorite, 
 
             <button
               type="button"
-              className={`p-1.5 rounded-lg bg-[#F8FAFC] hover:bg-[#F1F5F9] border border-[#E2E8F0] transition-colors shrink-0 cursor-pointer ${isSaved ? "text-[#FF7900]" : "text-[#94A3B8]"}`}
+              className={`p-1.5 rounded-lg bg-[#F8FAFC] hover:bg-slate-100 border border-[#D5DEE5] transition-colors shrink-0 cursor-pointer ${isSaved ? "text-[#2F6B73]" : "text-[#94A3B8]"}`}
               onClick={(event) => { event.stopPropagation(); onFavorite(shop); }}
               aria-label={isSaved ? "Remove from saved shops" : "Save workshop"}
             >
@@ -70,7 +70,7 @@ export default function ShopCard({ shop, language, isSaved, onOpen, onFavorite, 
           </div>
 
           <p className="text-xs text-[#64748B] flex items-center gap-1 truncate mb-2">
-            <MapPin size={12} className="text-[#FF7900] shrink-0" />
+            <MapPin size={12} className="text-[#2F6B73] shrink-0" />
             <span className="truncate">{shop.address}</span>
           </p>
 
@@ -79,9 +79,9 @@ export default function ShopCard({ shop, language, isSaved, onOpen, onFavorite, 
               <Star size={12} fill="currentColor" /> {shop.rating.toFixed(1)}
             </span>
             <span>({shop.reviewCount})</span>
-            <span className="text-[#CBD5E1]">•</span>
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-              status === "free" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : status === "busy" ? "bg-amber-50 text-amber-700 border border-amber-200" : "bg-red-50 text-red-700 border border-red-200"
+            <span className="text-[#D5DEE5]">•</span>
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+              status === "free" ? "bg-[#DCFCE7] text-[#166534] border border-[#86EFAC]" : status === "busy" ? "bg-amber-50 text-amber-700 border border-amber-200" : "bg-[#FEE2E2] text-[#991B1B] border border-[#FCA5A5]"
             }`}>
               {statusText}
             </span>
@@ -89,7 +89,7 @@ export default function ShopCard({ shop, language, isSaved, onOpen, onFavorite, 
 
           <div className="flex items-center gap-1.5 mt-2 flex-wrap">
             {shop.specializations.slice(0, 2).map((specialty) => (
-              <span key={specialty} className="text-[10px] font-medium text-[#475569] bg-[#F1F5F9] border border-[#E2E8F0] px-2 py-0.5 rounded">
+              <span key={specialty} className="text-[10px] font-medium text-[#475569] bg-[#F8FAFC] border border-[#D5DEE5] px-2 py-0.5 rounded-lg">
                 {specialty}
               </span>
             ))}
@@ -98,14 +98,14 @@ export default function ShopCard({ shop, language, isSaved, onOpen, onFavorite, 
       </div>
 
       {/* Card Footer Actions */}
-      <div className="flex items-center justify-between pt-3 border-t border-[#E2E8F0] mt-3">
+      <div className="flex items-center justify-between pt-3 border-t border-[#D5DEE5] mt-3">
         <span className="text-xs text-[#64748B]">
-          Est. Charge: <strong className="text-[#0F172A]">₹{shop.priceMin} - ₹{shop.priceMax}</strong>
+          Est. Charge: <strong className="text-[#172033]">₹{shop.priceMin} - ₹{shop.priceMax}</strong>
         </span>
 
         <div className="flex items-center gap-2">
           <a
-            className="w-8 h-8 rounded-lg bg-[#F1F5F9] hover:bg-[#FF7900] hover:text-white text-[#475569] border border-[#E2E8F0] flex items-center justify-center transition-colors"
+            className="w-8 h-8 rounded-lg bg-[#F8FAFC] hover:bg-[#2F6B73] hover:text-white text-[#475569] border border-[#D5DEE5] flex items-center justify-center transition-colors"
             href={getTelUri(shop.phone) || "#"}
             aria-label={`Call ${shop.shopName}`}
             onClick={(event) => {
@@ -119,7 +119,7 @@ export default function ShopCard({ shop, language, isSaved, onOpen, onFavorite, 
 
           <button
             type="button"
-            className="px-3 py-1.5 rounded-lg bg-[#FF7900] hover:bg-[#ea580c] text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+            className="px-3 py-1.5 rounded-lg bg-[#2F6B73] hover:bg-[#24545A] text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer"
             onClick={(event) => { event.stopPropagation(); onOpen(shop); }}
           >
             <span>Details</span>

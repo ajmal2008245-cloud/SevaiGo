@@ -2,20 +2,12 @@
 
 import React from "react";
 import {
-  Bell,
-  Bike,
   Calendar,
   ChevronRight,
-  CreditCard,
-  Crown,
   HelpCircle,
-  LifeBuoy,
   LogOut,
-  Moon,
   Settings,
-  Shield,
   ShieldCheck,
-  Sparkles,
   Store,
   Tag,
   User,
@@ -39,15 +31,27 @@ export default function ProfileView({
   onOpenHelp,
 }: ProfileViewProps) {
   const isMechanic = user?.role === "mechanic";
-  const userName = user?.name || (user?.phone ? (isMechanic ? `Mechanic ${user.phone.slice(-4)}` : `Rider ${user.phone.slice(-4)}`) : "SevaiGo Member");
-  const userEmail = user?.email && !user.email.includes("@sevaigo.local") ? user.email : (user?.phone ? `+91 ${user.phone.replace(/\D/g, "")}` : "Verified Mobile Account");
+  const userName =
+    user?.name ||
+    (user?.phone
+      ? isMechanic
+        ? `Mechanic ${user.phone.slice(-4)}`
+        : `Rider ${user.phone.slice(-4)}`
+      : "SevaiGo Member");
+  const userEmail =
+    user?.email && !user.email.includes("@sevaigo.local")
+      ? user.email
+      : user?.phone
+      ? `+91 ${user.phone.replace(/\D/g, "")}`
+      : "Verified Mobile Account";
 
-  const initials = userName
-    .split(" ")
-    .filter(Boolean)
-    .map((p) => p[0]?.toUpperCase())
-    .slice(0, 2)
-    .join("") || (isMechanic ? "M" : "C");
+  const initials =
+    userName
+      .split(" ")
+      .filter(Boolean)
+      .map((p) => p[0]?.toUpperCase())
+      .slice(0, 2)
+      .join("") || (isMechanic ? "M" : "C");
 
   // Role-specific menu items
   const menuItems = isMechanic
@@ -61,42 +65,31 @@ export default function ProfileView({
         },
         {
           id: "help",
-          title: "Mechanic Partner Support",
+          title: "Partner Helpline & Support",
           icon: HelpCircle,
           action: onOpenHelp,
-        },
-        {
-          id: "settings",
-          title: "Garage Settings",
-          icon: Settings,
-          action: () => alert("Garage profile and notifications are active."),
         },
       ]
     : [
         {
+          id: "rescue",
+          title: "Roadside Breakdown Assistance",
+          icon: Wrench,
+          action: () => onNavigate("home"),
+          badge: "Live",
+        },
+        {
           id: "bookings",
           title: "My Service Bookings",
           icon: Calendar,
-          action: () => onNavigate("activity"),
-        },
-        {
-          id: "garages",
-          title: "Nearby Certified Garages",
-          icon: Store,
-          action: () => onNavigate("garages"),
-        },
-        {
-          id: "bikes",
-          title: "My Vehicles",
-          icon: Bike,
-          action: () => onNavigate("vehicles"),
+          action: () => onNavigate("track"),
         },
         {
           id: "offers",
           title: "Offers & Coupons",
           icon: Tag,
           action: onOpenOffers,
-          badge: "3 New",
+          badge: "New",
         },
         {
           id: "help",
@@ -104,34 +97,28 @@ export default function ProfileView({
           icon: HelpCircle,
           action: onOpenHelp,
         },
-        {
-          id: "settings",
-          title: "Settings",
-          icon: Settings,
-          action: () => alert("Notification settings saved."),
-        },
       ];
 
   return (
-    <div className="w-full max-w-xl mx-auto px-4 py-4 md:py-6 text-[#0F172A] pb-28 font-['DM_Sans',sans-serif]">
+    <div className="w-full max-w-xl mx-auto px-4 py-4 md:py-6 text-[#172033] pb-28 font-['DM_Sans',sans-serif]">
       {/* User Header Profile Card */}
-      <div className="p-5 rounded-2xl bg-[#FFFFFF] border border-[#E2E8F0] shadow-sm mb-6 flex items-center justify-between">
+      <div className="p-5 rounded-2xl bg-white border border-[#D5DEE5] shadow-xs mb-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="relative">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#FF7900] via-[#FFB020] to-[#ea580c] p-0.5 shadow-md">
-              <div className="w-full h-full rounded-full bg-[#FFFFFF] flex items-center justify-center overflow-hidden">
-                <span className="text-xl font-black text-[#FF7900] tracking-wide font-['Manrope']">{initials}</span>
+            <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#2F6B73] via-[#3B82F6] to-[#1E484E] p-0.5 shadow-xs">
+              <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
+                <span className="text-xl font-black text-[#2F6B73] tracking-wide font-['Manrope']">{initials}</span>
               </div>
             </div>
-            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#FF7900] text-white flex items-center justify-center text-[10px] shadow">
+            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#2F6B73] text-white flex items-center justify-center text-[10px] shadow">
               {isMechanic ? <Wrench size={12} /> : <ShieldCheck size={12} />}
             </div>
           </div>
 
           <div>
-            <h1 className="text-lg font-bold text-[#0F172A] leading-tight">{userName}</h1>
+            <h1 className="text-lg font-bold text-[#172033] leading-tight">{userName}</h1>
             <p className="text-xs text-[#64748B] mt-0.5">{userEmail}</p>
-            <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FF7900]/10 border border-[#FF7900]/25 text-[#FF7900] text-[10px] font-bold">
+            <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#DCFCE7] border border-[#86EFAC] text-[#166534] text-[10px] font-bold">
               {isMechanic ? (
                 <>
                   <Wrench size={11} />
@@ -150,7 +137,7 @@ export default function ProfileView({
         <button
           type="button"
           onClick={onLogout}
-          className="p-2.5 rounded-xl bg-[#F8FAFC] hover:bg-red-50 text-[#64748B] hover:text-red-500 border border-[#E2E8F0] hover:border-red-200 transition-all cursor-pointer"
+          className="p-2.5 rounded-xl bg-[#F8FAFC] hover:bg-red-50 text-[#64748B] hover:text-red-500 border border-[#D5DEE5] hover:border-red-200 transition-all cursor-pointer"
           title="Sign out"
         >
           <LogOut size={18} />
@@ -158,7 +145,7 @@ export default function ProfileView({
       </div>
 
       {/* Menu List */}
-      <div className="rounded-2xl bg-[#FFFFFF] border border-[#E2E8F0] overflow-hidden divide-y divide-[#E2E8F0] mb-6 shadow-sm">
+      <div className="rounded-2xl bg-white border border-[#D5DEE5] overflow-hidden divide-y divide-[#D5DEE5] mb-6 shadow-xs">
         {menuItems.map((item) => {
           const IconComp = item.icon;
           return (
@@ -166,18 +153,18 @@ export default function ProfileView({
               key={item.id}
               type="button"
               onClick={item.action}
-              className="w-full px-5 py-4 flex items-center justify-between hover:bg-[#F8FAFC] active:bg-[#F1F5F9] transition-colors cursor-pointer text-left"
+              className="w-full px-5 py-4 flex items-center justify-between hover:bg-[#F8FAFC] active:bg-[#F4FAFC] transition-colors cursor-pointer text-left"
             >
               <div className="flex items-center gap-3.5">
-                <div className="w-9 h-9 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-center text-[#FF7900]">
+                <div className="w-9 h-9 rounded-xl bg-[#F8FAFC] border border-[#D5DEE5] flex items-center justify-center text-[#2F6B73]">
                   <IconComp size={18} />
                 </div>
-                <span className="text-sm font-semibold text-[#0F172A]">{item.title}</span>
+                <span className="text-sm font-semibold text-[#172033]">{item.title}</span>
               </div>
 
               <div className="flex items-center gap-2">
                 {item.badge && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#FF7900]/10 text-[#FF7900] font-bold border border-[#FF7900]/20">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#EAF4FF] text-[#2F6B73] font-bold border border-[#BFDBFE]">
                     {item.badge}
                   </span>
                 )}
@@ -189,7 +176,7 @@ export default function ProfileView({
       </div>
 
       <div className="text-center text-xs text-[#94A3B8]">
-        SevaiGo v2.4 • Supabase Verified • Clean White Edition
+        SevaiGo v2.5 • Verified Roadside Assistance Network
       </div>
     </div>
   );

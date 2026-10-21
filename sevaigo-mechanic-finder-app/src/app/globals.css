@@ -2,35 +2,36 @@
 @import "tailwindcss";
 
 :root, html, html[data-theme="dark"] {
-  --bg: #FFFFFF;
-  --bg-secondary: #F8FAFC;
+  --bg: #F4FAFC;
+  --bg-secondary: #EAF4FF;
   --surface: #FFFFFF;
-  --surface-soft: #F1F5F9;
-  --text: #0F172A;
-  --heading: #0F172A;
+  --surface-soft: #F8FAFC;
+  --text: #172033;
+  --heading: #172033;
   --muted: #64748B;
   --muted-dark: #475569;
-  --border: #E2E8F0;
-  --border-strong: #CBD5E1;
-  --orange: #FF7900;
-  --orange-glow: rgba(255, 121, 0, 0.2);
-  --amber: #FFB020;
-  --red: #FF7900;
-  --red-dark: #ea580c;
-  --red-soft: rgba(255, 121, 0, 0.08);
-  --green: #10B981;
-  --green-soft: rgba(16, 185, 129, 0.1);
+  --border: #D5DEE5;
+  --border-strong: #94A3B8;
+  --teal: #2F6B73;
+  --teal-dark: #24545A;
+  --teal-soft: rgba(47, 107, 115, 0.1);
   --blue: #3B82F6;
-  --blue-soft: rgba(59, 130, 246, 0.1);
-  --shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  --blue-soft: #EAF4FF;
+  --green: #10B981;
+  --green-soft: #DCFCE7;
+  --red: #EF4444;
+  --red-soft: #FEE2E2;
+  --shadow: 0 4px 20px rgba(23, 32, 51, 0.05);
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body {
   margin: 0;
-  color: #0F172A;
+  color: #172033;
+  background-color: #F4FAFC;
   font-family: "DM Sans", "Noto Sans Tamil", sans-serif;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 @media (min-width: 769px) {
   html, body {
@@ -40,17 +41,18 @@ body {
 }
 @media (max-width: 768px) {
   html, body {
-    background: #FFFFFF !important;
+    background: #F4FAFC !important;
+    overflow-x: hidden;
   }
 }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .62; }
-button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid rgba(255, 121, 0, .28); outline-offset: 2px; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid rgba(47, 107, 115, .35); outline-offset: 2px; }
 a { color: inherit; text-decoration: none; }
 h1, h2, h3, h4, p { margin-top: 0; }
 h1, h2, h3, h4 { font-family: "Manrope", "Noto Sans Tamil", sans-serif; color: var(--heading); }
-::selection { background: #ffe4cc; color: #c2410c; }
+::selection { background: #EAF4FF; color: #2F6B73; }
 
 .app-shell { display: flex; min-height: 100vh; }
 .sidebar { width: 238px; flex: 0 0 238px; height: 100vh; position: sticky; top: 0; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 25px 14px 15px; z-index: 60; }
@@ -1800,31 +1802,34 @@ textarea::placeholder {
   .sevaigo-viewport-wrapper {
     display: block !important;
     width: 100% !important;
+    max-width: 100vw !important;
     min-height: 100vh !important;
     min-height: 100dvh !important;
     padding: 0 !important;
     margin: 0 !important;
-    background: #FFFFFF !important;
-    overflow: visible !important;
+    background: #F4FAFC !important;
+    overflow-x: hidden !important;
     user-select: auto !important;
   }
 
   .device-chassis-container {
     display: block !important;
     width: 100% !important;
+    max-width: 100% !important;
     height: auto !important;
     min-height: 100vh !important;
     min-height: 100dvh !important;
-    max-width: none !important;
     aspect-ratio: auto !important;
     padding: 0 !important;
     margin: 0 !important;
     transform: none !important;
+    overflow-x: hidden !important;
   }
 
   .device-phone-frame {
     display: block !important;
     width: 100% !important;
+    max-width: 100% !important;
     height: auto !important;
     min-height: 100vh !important;
     min-height: 100dvh !important;
@@ -1834,16 +1839,19 @@ textarea::placeholder {
     background: transparent !important;
     box-shadow: none !important;
     border: none !important;
+    overflow-x: hidden !important;
   }
 
   .device-screen-viewport {
     display: block !important;
     width: 100% !important;
+    max-width: 100% !important;
     height: auto !important;
     min-height: 100vh !important;
     min-height: 100dvh !important;
     border-radius: 0 !important;
-    overflow: visible !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
     background: transparent !important;
     transform: none !important;
   }
@@ -1851,12 +1859,15 @@ textarea::placeholder {
   .device-screen-content {
     display: block !important;
     width: 100% !important;
+    max-width: 100% !important;
     height: auto !important;
     min-height: 100vh !important;
     min-height: 100dvh !important;
     padding-top: 0 !important;
     padding-bottom: 0 !important;
-    overflow: visible !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
+    background: #F4FAFC !important;
   }
 }
 

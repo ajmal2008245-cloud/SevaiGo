@@ -28,7 +28,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#FF7900",
+  themeColor: "#2F6B73",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -43,7 +43,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-title" content="SevaiGo" />
-        <meta name="theme-color" content="#FF7900" />
+        <meta name="theme-color" content="#2F6B73" />
       </head>
       <body>
         <DeviceShell>{children}</DeviceShell>

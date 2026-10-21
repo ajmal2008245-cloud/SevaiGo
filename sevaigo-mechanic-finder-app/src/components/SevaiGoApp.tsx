@@ -222,23 +222,9 @@ export default function SevaiGoApp({
     setCheckingAuth(false);
   }, []);
 
-  const handleLoginSuccess = async (phone: string, inputName?: string, role: "customer" | "mechanic" = "customer") => {
-    let finalRole = role;
-    let finalName = inputName || (role === "mechanic" ? `Mechanic ${phone.slice(-4)}` : `Rider ${phone.slice(-4)}`);
-
-    // Verify role securely with Supabase profiles table
-    try {
-      const res = await fetch("/api/auth/profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, name: finalName, role }),
-      });
-      const data = await res.json().catch(() => null);
-      if (data?.profile?.role) {
-        finalRole = data.profile.role;
-        finalName = data.profile.name || finalName;
-      }
-    } catch {}
+  const handleLoginSuccess = (phone: string, inputName?: string, role: "customer" | "mechanic" = "customer") => {
+    const finalRole = role;
+    const finalName = inputName || (role === "mechanic" ? `Mechanic ${phone.slice(-4)}` : `Rider ${phone.slice(-4)}`);
 
     try {
       localStorage.setItem("isLoggedIn", "true");
@@ -682,11 +668,11 @@ export default function SevaiGoApp({
   // 1. Splash Loader while verifying auth
   if (checkingAuth) {
     return (
-      <div className="min-h-screen w-full bg-[#FFFFFF] flex flex-col items-center justify-center font-['DM_Sans',sans-serif]">
-        <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-200 flex items-center justify-center mb-3 shadow-sm">
+      <div className="min-h-screen w-full bg-[#F4FAFC] flex flex-col items-center justify-center font-['DM_Sans',sans-serif]">
+        <div className="w-16 h-16 rounded-2xl bg-[#EAF4FF] border border-[#BFDBFE] flex items-center justify-center mb-3 shadow-xs">
           <Image src="/images/sevaigo-logo.png" alt="SevaiGo" width={42} height={42} priority />
         </div>
-        <div className="w-6 h-6 border-2 border-[#FF7900] border-t-transparent rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-[#2F6B73] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -798,30 +784,30 @@ export default function SevaiGoApp({
       {/* Desktop Call Helper Modal */}
       {callingShop && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
           onMouseDown={(e) => { if (e.target === e.currentTarget) setCallingShop(null); }}
         >
-          <div className="relative w-full max-w-sm rounded-2xl bg-[#121820] border border-white/10 p-5 text-center text-white shadow-2xl">
+          <div className="relative w-full max-w-sm rounded-2xl bg-white border border-[#D5DEE5] p-5 text-center text-[#172033] shadow-xl">
             <button
               onClick={() => setCallingShop(null)}
-              className="absolute top-4 right-4 text-[#A5ADB8] hover:text-white"
+              className="absolute top-4 right-4 text-[#64748B] hover:text-[#172033]"
             >
               <X size={18} />
             </button>
-            <div className="w-14 h-14 rounded-full bg-[#FF7900]/20 text-[#FF7900] mx-auto flex items-center justify-center mb-3">
-              <Phone size={26} />
+            <div className="w-14 h-14 rounded-full bg-[#EAF4FF] text-[#2F6B73] border border-[#BFDBFE] mx-auto flex items-center justify-center mb-3">
+              <Phone size={24} />
             </div>
-            <h3 className="text-base font-bold text-white mb-1">{callingShop.shopName}</h3>
-            <p className="text-xs text-[#A5ADB8] mb-4">Owner: {callingShop.ownerName}</p>
+            <h3 className="text-base font-bold text-[#172033] mb-1">{callingShop.shopName}</h3>
+            <p className="text-xs text-[#64748B] mb-4">Owner: {callingShop.ownerName}</p>
 
-            <div className="p-3 rounded-xl bg-[#0D1117] border border-white/10 text-lg font-mono font-bold text-[#FF7900] mb-4">
+            <div className="p-3 rounded-xl bg-[#F8FAFC] border border-[#D5DEE5] text-lg font-mono font-bold text-[#2F6B73] mb-4">
               {formatPhoneDisplay(callingShop.phone || callingShop.shopPhone)}
             </div>
 
             <div className="flex flex-col gap-2">
               <a
                 href={getTelUri(callingShop.phone || callingShop.shopPhone) || "#"}
-                className="py-3 px-4 rounded-xl bg-[#FF7900] text-white font-bold text-xs uppercase tracking-wider"
+                className="py-3 px-4 rounded-xl bg-[#2F6B73] hover:bg-[#24545A] text-white font-bold text-xs uppercase tracking-wider transition-colors"
               >
                 Launch Phone App
               </a>
@@ -840,7 +826,7 @@ export default function SevaiGoApp({
                 }
                 target="_blank"
                 rel="noopener noreferrer"
-                className="py-2.5 px-4 rounded-xl bg-[#25D366] text-white font-bold text-xs flex items-center justify-center gap-1.5"
+                className="py-2.5 px-4 rounded-xl bg-[#DCFCE7] hover:bg-emerald-100 text-[#166534] border border-[#86EFAC] font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
               >
                 <MessageCircle size={15} /> Chat on WhatsApp
               </a>
@@ -851,10 +837,10 @@ export default function SevaiGoApp({
 
       {/* Floating Toast Message */}
       {toast && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-[#121820]/95 border border-[#FF7900]/40 text-white text-xs font-semibold shadow-[0_10px_30px_rgba(255,121,0,0.35)] backdrop-blur-md animate-in fade-in slide-in-from-bottom-3 duration-200">
-          <CheckCircle2 size={16} className="text-[#FF7900]" />
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-[#172033]/95 border border-[#2F6B73]/50 text-white text-xs font-semibold shadow-lg backdrop-blur-md animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <CheckCircle2 size={16} className="text-[#38BDF8]" />
           <span>{toast}</span>
-          <button onClick={() => setToast("")} className="text-[#A5ADB8] hover:text-white ml-1">
+          <button onClick={() => setToast("")} className="text-slate-300 hover:text-white ml-1">
             <X size={14} />
           </button>
         </div>

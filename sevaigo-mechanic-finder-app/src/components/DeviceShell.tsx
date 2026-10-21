@@ -70,7 +70,7 @@ export default function DeviceShell({ children }: DeviceShellProps) {
           >
             {isFullscreen ? (
               <>
-                <Minimize2 size={13} className="text-[#FF7900]" />
+                <Minimize2 size={13} className="text-[#2F6B73]" />
                 <span>Phone Preview</span>
               </>
             ) : (

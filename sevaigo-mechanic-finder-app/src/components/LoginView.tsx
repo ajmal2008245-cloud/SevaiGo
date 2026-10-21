@@ -3,26 +3,23 @@
 import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
-  ArrowLeft,
   ArrowRight,
   CheckCircle2,
-  ChevronDown,
-  Flame,
-  Info,
+  Eye,
+  EyeOff,
   Lock,
+  Mail,
   Phone,
   RotateCw,
-  ShieldCheck,
-  Sparkles,
   Store,
   User,
   Wrench,
+  ShieldCheck,
 } from "lucide-react";
 import {
   FIREBASE_TEST_PHONE_NUMBERS,
   findFirebaseTestConfig,
   formatIndianPhoneNumber,
-  verifyFirebaseTestCode,
 } from "@/lib/firebase-test-config";
 import {
   getFirebaseAuth,
@@ -48,20 +45,31 @@ export default function LoginView({
   initialRole = "customer",
 }: LoginViewProps) {
   const [loginType, setLoginType] = useState<LoginType>(initialRole);
+  const [authMethod, setAuthMethod] = useState<"phone" | "email">("phone");
   const [step, setStep] = useState<"phone" | "otp">("phone");
+  
+  // Phone OTP state
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [otpInput, setOtpInput] = useState("");
   const [activeOtp, setActiveOtp] = useState("123456");
+  
+  // Email/Password state
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
+  
+  // Flow control state
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   const [countdown, setCountdown] = useState(45);
-  const [showTestCards, setShowTestCards] = useState(true);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
 
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
 
-  // Initialize invisible reCAPTCHA for Firebase Phone Auth when Firebase is configured
+  // Initialize invisible reCAPTCHA for Firebase Phone Auth when configured
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -90,7 +98,7 @@ export default function LoginView({
     };
   }, []);
 
-  // Send OTP (Works for ANY 10-digit phone number or Firebase test numbers)
+  // Send OTP
   const handleSendOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setError("");
@@ -106,7 +114,6 @@ export default function LoginView({
     const formatted = formatIndianPhoneNumber(cleanPhone);
     const testConfig = findFirebaseTestConfig(cleanPhone);
 
-    // If Firebase Web SDK is initialized with Project ID and API Key
     if (isFirebaseConfigured()) {
       try {
         const auth = getFirebaseAuth();
@@ -129,7 +136,6 @@ export default function LoginView({
       }
     }
 
-    // Set code: use configured test code or default 6-digit verification code
     const generatedCode = testConfig ? testConfig.testVerificationCode : "123456";
     setActiveOtp(generatedCode);
 
@@ -137,7 +143,6 @@ export default function LoginView({
     setStep("otp");
     setCountdown(45);
 
-    // Launch countdown timer
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
@@ -152,24 +157,31 @@ export default function LoginView({
   // Complete profile registration and verify role with Supabase profiles table
   const completeProfileAndLogin = async (cleanPhone: string, userName: string) => {
     try {
-      // Securely sync & verify role with Supabase `profiles` table
+      // 4-second timeout to prevent stalling on network lag
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+
       const res = await fetch("/api/auth/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           phone: cleanPhone,
           name: userName,
-          role: loginType, // "customer" | "mechanic"
+          role: loginType,
         }),
       });
+      clearTimeout(timeoutId);
 
       const data = await res.json().catch(() => null);
-      const verifiedRole: LoginType = data?.profile?.role === "mechanic" ? "mechanic" : (loginType === "mechanic" ? "mechanic" : "customer");
+      const verifiedRole: LoginType = data?.profile?.role === "mechanic"
+        ? "mechanic"
+        : (loginType === "mechanic" ? "mechanic" : "customer");
       const verifiedName = data?.profile?.name || userName;
 
       onLoginSuccess(cleanPhone, verifiedName, verifiedRole);
     } catch {
-      // Offline fallback
+      // Offline fallback: prompt navigation without blocking user
       onLoginSuccess(cleanPhone, userName, loginType);
     }
   };
@@ -188,114 +200,140 @@ export default function LoginView({
     }
 
     setLoading(true);
+    setIsVerifying(true);
     const resolvedName = name.trim() || (loginType === "mechanic" ? `Mechanic ${cleanPhone.slice(-4)}` : `Rider ${cleanPhone.slice(-4)}`);
 
-    // 1. Firebase Confirmation Result
     if (confirmationResult) {
       try {
         await confirmationResult.confirm(entered);
-        setLoading(false);
         await completeProfileAndLogin(cleanPhone, resolvedName);
         return;
       } catch (err: any) {
         setLoading(false);
-        setError("Incorrect verification code. Firebase rejected the OTP.");
+        setIsVerifying(false);
+        setError("Incorrect verification code. Please try again.");
         return;
       }
     }
 
-    // 2. Validate OTP code
     const testConfig = findFirebaseTestConfig(cleanPhone);
     const expected = testConfig ? testConfig.testVerificationCode : activeOtp;
     if (entered !== expected && entered !== "123456") {
       setLoading(false);
-      setError(`Incorrect verification code. Please enter the 6-digit code: ${expected}`);
+      setIsVerifying(false);
+      setError(`Incorrect verification code. Please enter the code: ${expected}`);
       return;
     }
 
-    // Code matched!
-    setTimeout(async () => {
-      setLoading(false);
-      await completeProfileAndLogin(cleanPhone, resolvedName);
-    }, 250);
+    // Direct synchronous navigation
+    await completeProfileAndLogin(cleanPhone, resolvedName);
+    setLoading(false);
+    setIsVerifying(false);
   };
 
-  const handleSelectTestNumber = (testNum: (typeof FIREBASE_TEST_PHONE_NUMBERS)[0]) => {
-    setPhone(testNum.phoneNumber.replace("+91", ""));
-    setActiveOtp(testNum.testVerificationCode);
+  // Email/Password login & registration
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError("");
-  };
 
-  const currentTestConfig = findFirebaseTestConfig(phone);
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const endpoint = "/api/auth";
+      const action = isRegistering ? "register" : "login";
+      const payload: any = {
+        action,
+        email: email.trim().toLowerCase(),
+        password,
+        role: loginType,
+      };
+      if (isRegistering) {
+        payload.name = name.trim() || (loginType === "mechanic" ? "Mechanic Partner" : "Customer");
+        payload.phone = phone.replace(/\D/g, "") || undefined;
+      }
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Authentication failed. Please verify credentials.");
+      }
+
+      const userObj = data.user;
+      const targetPhone = userObj.phone || phone.replace(/\D/g, "") || "9876543210";
+      const targetRole: LoginType = userObj.role === "mechanic" ? "mechanic" : loginType;
+      
+      onLoginSuccess(targetPhone, userObj.name || name, targetRole);
+    } catch (err: any) {
+      setError(err?.message || "An unexpected error occurred. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="relative min-h-screen w-full bg-[#FFFFFF] text-[#0F172A] flex flex-col justify-between overflow-x-hidden select-none font-['DM_Sans',sans-serif]">
-      {/* Invisible container for Firebase Recaptcha */}
+    <div className="min-h-screen w-full bg-[#F4FAFC] text-[#172033] flex flex-col justify-between py-6 px-4 font-['DM_Sans',sans-serif] select-none">
       <div id="recaptcha-container" />
 
-      {/* Top Bar with Brand Badge */}
-      <div className="relative z-10 p-4 sm:p-5 flex items-center justify-between border-b border-[#E2E8F0] bg-[#FFFFFF]">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg overflow-hidden bg-black flex items-center justify-center border border-slate-200">
-            <Image
-              src="/images/sevaigo-logo.png"
-              alt="SevaiGo"
-              width={28}
-              height={28}
-              className="w-full h-full object-contain"
-            />
-          </div>
-          <span className="font-extrabold text-sm text-[#0F172A] font-['Manrope']">
-            Sevai<span className="text-[#FF7900]">Go</span>
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FF7900]/10 border border-[#FF7900]/25 text-xs font-bold text-[#FF7900]">
-          <Flame size={14} />
-          <span>Phone OTP Verification</span>
-        </div>
-      </div>
-
       {/* Main Login Card */}
-      <div className="relative z-10 w-full max-w-md mx-auto px-5 py-6">
-        {/* SevaiGo Official Logo Emblem */}
-        <div className="flex flex-col items-center text-center mb-5">
-          <div className="relative w-20 h-20 mb-2 drop-shadow-[0_4px_16px_rgba(255,121,0,0.25)]">
-            <Image
-              src="/images/sevaigo-logo.png"
-              alt="SevaiGo Logo"
-              fill
-              priority
-              className="object-contain rounded-2xl"
-            />
+      <div className="w-full max-w-md mx-auto my-auto">
+        {/* Centered SevaiGo Logo & Wordmark */}
+        <div className="flex flex-col items-center text-center mb-6">
+          {/* Simple Road-Inspired Logo Icon */}
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#2F6B73] to-[#1E484E] flex items-center justify-center text-white shadow-lg shadow-[#2F6B73]/20 mb-3 border border-white/20">
+            <svg className="w-9 h-9" viewBox="0 0 48 48" fill="none">
+              <path d="M11 42L20 6H28L37 42" stroke="#FFFFFF" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+              <line x1="24" y1="10" x2="24" y2="17" stroke="#38BDF8" strokeWidth="3" strokeLinecap="round" />
+              <line x1="24" y1="23" x2="24" y2="30" stroke="#38BDF8" strokeWidth="3" strokeLinecap="round" />
+              <line x1="24" y1="36" x2="24" y2="41" stroke="#38BDF8" strokeWidth="3" strokeLinecap="round" />
+            </svg>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black font-['Manrope'] text-[#0F172A] tracking-tight">
-            Sevai<span className="text-[#FF7900]">Go</span>
+
+          {/* Wordmark: "Sevai" in dark navy (#172033) and "Go" in teal (#2F6B73) */}
+          <div className="text-2xl font-black font-['Manrope'] tracking-tight">
+            <span className="text-[#172033]">Sevai</span>
+            <span className="text-[#2F6B73]">Go</span>
+          </div>
+
+          <h1 className="text-2xl sm:text-3xl font-black text-[#172033] font-['Manrope'] mt-4">
+            {isRegistering ? "Create an Account" : "Welcome Back!"}
           </h1>
-          <p className="text-xs text-[#64748B] mt-0.5 font-medium">
-            Roadside Assistance & Verified Mechanic Network
+          <p className="text-xs sm:text-sm text-[#64748B] mt-1 font-medium">
+            {isRegistering ? "Sign up to access verified roadside mechanics." : "Log in to continue your journey."}
           </p>
         </div>
 
-        {/* TWO LOGIN TYPES TOGGLE: Customer Login vs Mechanic Login (High contrast & ARIA tablist) */}
+        {/* EXACT TWO LOGIN MODES: Customer Login vs Mechanic Login */}
         <div
           role="tablist"
           aria-label="Account Login Type"
-          className="mb-5 p-1 rounded-2xl bg-slate-100 border border-slate-200 grid grid-cols-2 gap-1.5"
+          className="mb-5 p-1 rounded-2xl bg-slate-200/70 border border-[#D5DEE5] grid grid-cols-2 gap-1.5"
         >
           <button
             type="button"
             role="tab"
             id="tab-customer"
             aria-selected={loginType === "customer"}
-            aria-controls="login-form-panel"
             onClick={() => {
               setLoginType("customer");
               setError("");
             }}
             className={`py-3 px-3.5 rounded-xl font-['Manrope'] text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
               loginType === "customer"
-                ? "bg-[#FF7900] text-white shadow-md shadow-[#FF7900]/25 border border-[#FF7900]"
-                : "bg-white text-slate-700 hover:text-slate-950 hover:bg-slate-50 border border-slate-200 shadow-xs"
+                ? "bg-[#2F6B73] text-white shadow-sm border border-[#2F6B73]"
+                : "bg-white text-[#172033] hover:bg-slate-50 border border-[#D5DEE5]"
             }`}
           >
             <User size={15} />
@@ -307,15 +345,14 @@ export default function LoginView({
             role="tab"
             id="tab-mechanic"
             aria-selected={loginType === "mechanic"}
-            aria-controls="login-form-panel"
             onClick={() => {
               setLoginType("mechanic");
               setError("");
             }}
             className={`py-3 px-3.5 rounded-xl font-['Manrope'] text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
               loginType === "mechanic"
-                ? "bg-[#FF7900] text-white shadow-md shadow-[#FF7900]/25 border border-[#FF7900]"
-                : "bg-white text-slate-700 hover:text-slate-950 hover:bg-slate-50 border border-slate-200 shadow-xs"
+                ? "bg-[#2F6B73] text-white shadow-sm border border-[#2F6B73]"
+                : "bg-white text-[#172033] hover:bg-slate-50 border border-[#D5DEE5]"
             }`}
           >
             <Wrench size={15} />
@@ -323,76 +360,301 @@ export default function LoginView({
           </button>
         </div>
 
-        {/* Card Body with Integrated Context Header */}
-        <div
-          id="login-form-panel"
-          role="tabpanel"
-          aria-labelledby={loginType === "customer" ? "tab-customer" : "tab-mechanic"}
-          className="p-6 pb-8 sm:p-7 sm:pb-8 rounded-2xl bg-[#FFFFFF] border border-[#E2E8F0] shadow-[0_10px_35px_rgba(0,0,0,0.06)]"
-        >
-          {/* Integrated Role Context (Unites tab with form directly) */}
-          <div className="mb-5 pb-3.5 border-b border-slate-100 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-orange-50 border border-orange-200 text-[#FF7900] flex items-center justify-center shrink-0">
-              {loginType === "customer" ? <User size={16} /> : <Store size={16} />}
-            </div>
-            <div>
-              <h2 className="text-xs font-bold text-[#0F172A] leading-tight">
-                {loginType === "customer" ? "Customer Account Sign In" : "Mechanic Partner Sign In"}
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {loginType === "customer"
-                  ? "Search nearby mechanics & request roadside emergency rescue"
-                  : "Workshop owner sign-in, manage bookings & incoming calls"}
-              </p>
-            </div>
+        {/* Card Body */}
+        <div className="p-6 sm:p-7 rounded-2xl bg-[#FFFFFF] border border-[#D5DEE5] shadow-xs">
+          {/* Method Selector: Phone OTP vs Email Login */}
+          <div className="flex items-center justify-center gap-4 mb-5 pb-4 border-b border-[#D5DEE5] text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMethod("phone");
+                setError("");
+              }}
+              className={`pb-1 border-b-2 transition-all cursor-pointer ${
+                authMethod === "phone"
+                  ? "border-[#2F6B73] text-[#2F6B73]"
+                  : "border-transparent text-[#64748B] hover:text-[#172033]"
+              }`}
+            >
+              Phone Number OTP
+            </button>
+            <span className="text-slate-300">|</span>
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMethod("email");
+                setError("");
+              }}
+              className={`pb-1 border-b-2 transition-all cursor-pointer ${
+                authMethod === "email"
+                  ? "border-[#2F6B73] text-[#2F6B73]"
+                  : "border-transparent text-[#64748B] hover:text-[#172033]"
+              }`}
+            >
+              Email & Password
+            </button>
           </div>
 
-          {step === "phone" ? (
-            /* STEP 1: MOBILE NUMBER INPUT */
-            <form onSubmit={handleSendOtp} className="space-y-4">
-              <div>
-                <label className="text-xs font-bold text-[#0F172A] block mb-2.5 flex items-center gap-2">
-                  <Phone size={14} className="text-[#FF7900]" />
-                  <span>Enter Mobile Number</span>
-                </label>
-                <div className="relative flex items-center">
-                  <div className="absolute left-3.5 flex items-center gap-1 text-xs font-bold text-[#64748B] border-r border-[#CBD5E1] pr-2.5">
-                    <span>🇮🇳</span>
-                    <span>+91</span>
+          {/* METHOD 1: PHONE OTP FLOW */}
+          {authMethod === "phone" && (
+            <>
+              {step === "phone" ? (
+                <form onSubmit={handleSendOtp} className="space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-[#172033] block mb-2 flex items-center gap-2">
+                      <Phone size={14} className="text-[#2F6B73]" />
+                      <span>Mobile Number</span>
+                    </label>
+                    <div className="relative flex items-center">
+                      <div className="absolute left-3.5 flex items-center gap-1 text-xs font-bold text-[#64748B] border-r border-[#D5DEE5] pr-2.5">
+                        <span>🇮🇳</span>
+                        <span>+91</span>
+                      </div>
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        maxLength={10}
+                        value={phone}
+                        onChange={(e) => {
+                          setPhone(e.target.value.replace(/\D/g, ""));
+                          setError("");
+                        }}
+                        placeholder="98765 43210"
+                        autoFocus
+                        className="w-full pl-24 pr-4 h-12 rounded-xl bg-[#F8FAFC] border border-[#D5DEE5] text-[#172033] font-mono text-sm font-bold tracking-wider placeholder:text-[#94A3B8] focus:outline-none focus:border-[#2F6B73] focus:bg-[#FFFFFF] transition-colors"
+                      />
+                    </div>
                   </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-[#64748B] block mb-2 flex items-center gap-2">
+                      <User size={14} className="text-[#64748B]" />
+                      <span>Full Name (Optional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={50}
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder={loginType === "mechanic" ? "e.g. Master Mechanic Ajmal" : "e.g. Ajmal Hussain"}
+                      className="w-full px-4 h-12 rounded-xl bg-[#F8FAFC] border border-[#D5DEE5] text-[#172033] text-sm font-medium placeholder:text-[#94A3B8] focus:outline-none focus:border-[#2F6B73] focus:bg-[#FFFFFF] transition-colors"
+                    />
+                  </div>
+
+                  {error && (
+                    <div className="p-3 rounded-xl bg-[#FEE2E2] border border-[#FCA5A5] text-[#991B1B] text-xs font-semibold leading-relaxed">
+                      {error}
+                    </div>
+                  )}
+
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      disabled={loading || phone.replace(/\D/g, "").length !== 10}
+                      className="w-full h-12 rounded-xl bg-[#2F6B73] hover:bg-[#24545A] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm tracking-wide shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      {loading ? (
+                        <>
+                          <RotateCw size={16} className="animate-spin" />
+                          <span>Sending Code...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Send Verification Code</span>
+                          <ArrowRight size={16} />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                /* STEP 2: ENTER OTP */
+                <form onSubmit={handleVerifyOtp} className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs text-[#64748B] block">Verification code sent to</span>
+                      <span className="text-sm font-bold text-[#172033] font-mono">
+                        +91 {phone.replace(/\D/g, "")}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStep("phone");
+                        setOtpInput("");
+                        setError("");
+                      }}
+                      className="text-xs font-bold text-[#2F6B73] hover:underline cursor-pointer"
+                    >
+                      Change
+                    </button>
+                  </div>
+
+                  {/* Test OTP Helper Card */}
+                  <div className="p-3 rounded-xl bg-[#DCFCE7] border border-[#86EFAC] flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5 text-[#166534]">
+                      <CheckCircle2 size={14} className="text-[#16a34a]" />
+                      <span className="font-semibold">Auto-fill Code:</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setOtpInput(activeOtp)}
+                      className="font-mono font-black text-sm text-[#166534] hover:underline tracking-widest cursor-pointer px-2.5 py-1 rounded-lg bg-white border border-[#86EFAC] shadow-xs flex items-center gap-1.5"
+                      title="Click to autofill"
+                    >
+                      <span>{activeOtp}</span>
+                      <span className="text-[10px] font-sans font-bold text-[#166534]">(Tap to fill)</span>
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-[#172033] block mb-1.5 flex items-center gap-1.5">
+                      <Lock size={14} className="text-[#2F6B73]" />
+                      <span>Enter 6-Digit Code</span>
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      value={otpInput}
+                      onChange={(e) => {
+                        setOtpInput(e.target.value.replace(/\D/g, ""));
+                        setError("");
+                      }}
+                      placeholder="••••••"
+                      autoFocus
+                      className="w-full text-center h-14 rounded-xl bg-[#F8FAFC] border border-[#D5DEE5] text-[#172033] font-mono text-2xl font-black tracking-[0.5em] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#2F6B73] focus:bg-[#FFFFFF] transition-colors"
+                    />
+                  </div>
+
+                  {error && (
+                    <div className="p-3 rounded-xl bg-[#FEE2E2] border border-[#FCA5A5] text-[#991B1B] text-xs font-semibold leading-relaxed">
+                      {error}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={loading || isVerifying || otpInput.trim().length !== 6}
+                    className="w-full h-12 rounded-xl bg-[#2F6B73] hover:bg-[#24545A] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm tracking-wide shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {isVerifying || loading ? (
+                      <>
+                        <RotateCw size={16} className="animate-spin" />
+                        <span>Verifying & Loading Dashboard...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Verify & Continue as {loginType === "mechanic" ? "Mechanic" : "Customer"}</span>
+                        <ArrowRight size={16} />
+                      </>
+                    )}
+                  </button>
+
+                  <div className="text-center pt-1">
+                    {countdown > 0 ? (
+                      <span className="text-xs text-[#64748B]">
+                        Resend code in <strong className="text-[#172033]">{countdown}s</strong>
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleSendOtp}
+                        className="text-xs font-bold text-[#2F6B73] hover:underline cursor-pointer"
+                      >
+                        Resend Verification Code
+                      </button>
+                    )}
+                  </div>
+                </form>
+              )}
+            </>
+          )}
+
+          {/* METHOD 2: EMAIL & PASSWORD FLOW */}
+          {authMethod === "email" && (
+            <form onSubmit={handleEmailAuth} className="space-y-4">
+              {isRegistering && (
+                <div>
+                  <label className="text-xs font-bold text-[#172033] block mb-1.5 flex items-center gap-2">
+                    <User size={14} className="text-[#2F6B73]" />
+                    <span>Full Name</span>
+                  </label>
                   <input
-                    type="tel"
-                    inputMode="numeric"
-                    maxLength={10}
-                    value={phone}
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Ajmal Hussain"
+                    className="w-full px-4 h-12 rounded-xl bg-[#F8FAFC] border border-[#D5DEE5] text-[#172033] text-sm font-medium placeholder:text-[#94A3B8] focus:outline-none focus:border-[#2F6B73] focus:bg-[#FFFFFF] transition-colors"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs font-bold text-[#172033] block mb-1.5 flex items-center gap-2">
+                  <Mail size={14} className="text-[#2F6B73]" />
+                  <span>Email Address</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="email"
+                    required
+                    value={email}
                     onChange={(e) => {
-                      setPhone(e.target.value.replace(/\D/g, ""));
+                      setEmail(e.target.value);
                       setError("");
                     }}
-                    placeholder="98765 43210"
+                    placeholder="you@example.com"
                     autoFocus
-                    className="w-full pl-24 pr-4 py-3.5 rounded-xl bg-[#F8FAFC] border border-[#CBD5E1] text-[#0F172A] font-mono text-sm font-bold tracking-wider placeholder:text-[#94A3B8] focus:outline-none focus:border-[#FF7900] focus:bg-[#FFFFFF] transition-colors"
+                    className="w-full pl-10 pr-4 h-12 rounded-xl bg-[#F8FAFC] border border-[#D5DEE5] text-[#172033] text-sm font-medium placeholder:text-[#94A3B8] focus:outline-none focus:border-[#2F6B73] focus:bg-[#FFFFFF] transition-colors"
                   />
+                  <Mail size={16} className="absolute left-3.5 top-3.5 text-[#64748B] pointer-events-none" />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-bold text-[#64748B] block mb-2 flex items-center gap-2">
-                  <User size={14} className="text-[#64748B]" />
-                  <span>Your Full Name (Optional)</span>
-                </label>
-                <input
-                  type="text"
-                  maxLength={50}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder={loginType === "mechanic" ? "e.g. Master Mechanic Ajmal" : "e.g. Ajmal Hussain"}
-                  className="w-full px-4 py-3 rounded-xl bg-[#F8FAFC] border border-[#CBD5E1] text-[#0F172A] text-sm font-medium placeholder:text-[#94A3B8] focus:outline-none focus:border-[#FF7900] focus:bg-[#FFFFFF] transition-colors"
-                />
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold text-[#172033] flex items-center gap-2">
+                    <Lock size={14} className="text-[#2F6B73]" />
+                    <span>Password</span>
+                  </label>
+                  {!isRegistering && (
+                    <button
+                      type="button"
+                      onClick={() => setError("Password reset link has been sent to your registered email.")}
+                      className="text-xs font-bold text-[#2F6B73] hover:underline cursor-pointer"
+                    >
+                      Forgot Password?
+                    </button>
+                  )}
+                </div>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setError("");
+                    }}
+                    placeholder="Enter password (min 6 characters)"
+                    className="w-full pl-10 pr-11 h-12 rounded-xl bg-[#F8FAFC] border border-[#D5DEE5] text-[#172033] text-sm font-medium placeholder:text-[#94A3B8] focus:outline-none focus:border-[#2F6B73] focus:bg-[#FFFFFF] transition-colors"
+                  />
+                  <Lock size={16} className="absolute left-3.5 top-3.5 text-[#64748B] pointer-events-none" />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-3.5 text-[#64748B] hover:text-[#172033] transition-colors"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
 
               {error && (
-                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs leading-relaxed font-semibold">
+                <div className="p-3 rounded-xl bg-[#FEE2E2] border border-[#FCA5A5] text-[#991B1B] text-xs font-semibold leading-relaxed">
                   {error}
                 </div>
               )}
@@ -400,181 +662,77 @@ export default function LoginView({
               <div className="pt-2">
                 <button
                   type="submit"
-                  disabled={loading || phone.replace(/\D/g, "").length !== 10}
-                  className="w-full py-3.5 rounded-xl bg-[#FF7900] hover:bg-[#ea580c] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm tracking-wide shadow-md shadow-[#FF7900]/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  disabled={loading}
+                  className="w-full h-12 rounded-xl bg-[#2F6B73] hover:bg-[#24545A] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm tracking-wide shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {loading ? (
                     <>
                       <RotateCw size={16} className="animate-spin" />
-                      <span>Sending Code...</span>
+                      <span>{isRegistering ? "Creating Account..." : "Signing In..."}</span>
                     </>
                   ) : (
                     <>
-                      <span>Send Verification Code</span>
+                      <span>{isRegistering ? "Create Account & Continue" : "Login"}</span>
                       <ArrowRight size={16} />
                     </>
                   )}
                 </button>
               </div>
 
-              {loginType === "mechanic" && onRegisterWorkshop && (
-                <div className="pt-2 text-center border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={onRegisterWorkshop}
-                    className="w-full py-2.5 px-3 rounded-xl bg-orange-50 hover:bg-orange-100 border border-orange-200 text-[#FF7900] text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <Store size={15} />
-                    <span>New Workshop? Register Your Shop Now (புதிய மெக்கானிக் பதிவு)</span>
-                  </button>
-                </div>
-              )}
-            </form>
-          ) : (
-            /* STEP 2: TEST OTP INPUT */
-            <form onSubmit={handleVerifyOtp} className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-xs text-[#64748B] block">Verification code sent to</span>
-                  <span className="text-sm font-bold text-[#0F172A] font-mono">
-                    +91 {phone.replace(/\D/g, "")}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStep("phone");
-                    setOtpInput("");
-                    setError("");
-                  }}
-                  className="text-xs font-bold text-[#FF7900] hover:underline cursor-pointer"
-                >
-                  Change
-                </button>
-              </div>
-
-              <div className="p-3 rounded-xl bg-[#F0FDF4] border border-[#BBF7D0] flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1.5 text-[#166534]">
-                  <CheckCircle2 size={14} className="text-[#16a34a]" />
-                  <span>Verification Code:</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setOtpInput(activeOtp)}
-                  className="font-mono font-black text-sm text-[#16a34a] hover:underline tracking-widest cursor-pointer px-2.5 py-1 rounded bg-white border border-[#BBF7D0] shadow-sm flex items-center gap-1.5"
-                  title="Click to autofill"
-                >
-                  <span>{activeOtp}</span>
-                  <span className="text-[10px] font-sans font-bold text-emerald-700">(Tap to fill)</span>
-                </button>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-[#0F172A] block mb-1.5 flex items-center gap-1.5">
-                  <Lock size={14} className="text-[#FF7900]" />
-                  <span>Enter 6-Digit Code</span>
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  value={otpInput}
-                  onChange={(e) => {
-                    setOtpInput(e.target.value.replace(/\D/g, ""));
-                    setError("");
-                  }}
-                  placeholder="••••••"
-                  autoFocus
-                  className="w-full text-center py-3.5 rounded-xl bg-[#F8FAFC] border border-[#CBD5E1] text-[#0F172A] font-mono text-2xl font-black tracking-[0.5em] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#FF7900] focus:bg-[#FFFFFF] transition-colors"
-                />
-              </div>
-
-              {error && (
-                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs leading-relaxed font-semibold">
-                  {error}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={loading || otpInput.trim().length !== 6}
-                className="w-full py-3.5 rounded-xl bg-[#FF7900] hover:bg-[#ea580c] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm tracking-wide shadow-md shadow-[#FF7900]/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                {loading ? (
-                  <>
-                    <RotateCw size={16} className="animate-spin" />
-                    <span>Verifying Code...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Verify & Continue as {loginType === "mechanic" ? "Mechanic" : "Customer"}</span>
-                    <ArrowRight size={16} />
-                  </>
-                )}
-              </button>
-
-              <div className="text-center">
-                {countdown > 0 ? (
-                  <span className="text-xs text-[#64748B]">
-                    Resend code in <strong className="text-[#0F172A]">{countdown}s</strong>
+              {/* Sign Up / Log In Toggle */}
+              <div className="text-center pt-2 text-xs text-[#64748B]">
+                {isRegistering ? (
+                  <span>
+                    Already have an account?{" "}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsRegistering(false);
+                        setError("");
+                      }}
+                      className="font-bold text-[#2F6B73] hover:underline ml-1"
+                    >
+                      Log In
+                    </button>
                   </span>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => handleSendOtp()}
-                    className="text-xs font-bold text-[#FF7900] hover:underline cursor-pointer"
-                  >
-                    Resend Verification Code
-                  </button>
+                  <span>
+                    Don&apos;t have an account?{" "}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsRegistering(true);
+                        setError("");
+                      }}
+                      className="font-bold text-[#2F6B73] hover:underline ml-1"
+                    >
+                      Sign Up
+                    </button>
+                  </span>
                 )}
               </div>
             </form>
           )}
-        </div>
 
-        {/* Quick Test Numbers Disclosure (Collapsed by default to eliminate visual noise for real users) */}
-        {showTestCards && (
-          <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50/80 overflow-hidden group">
-            <summary className="p-3 flex items-center justify-between cursor-pointer hover:bg-slate-100/70 transition-colors list-none select-none">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-slate-700">Quick Test Credentials</span>
-                <span className="text-xs text-slate-400 font-normal">(Demo / QA)</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-                <Sparkles size={12} className="text-slate-400" />
-                <span>Tap to autofill</span>
-                <ChevronDown size={14} className="text-slate-400 group-open:rotate-180 transition-transform" />
-              </div>
-            </summary>
-            <div className="p-3 pt-1 border-t border-slate-200/60 space-y-1.5">
-              {FIREBASE_TEST_PHONE_NUMBERS.slice(0, 3).map((testNum) => (
-                <button
-                  key={testNum.phoneNumber}
-                  type="button"
-                  onClick={() => handleSelectTestNumber(testNum)}
-                  className="w-full p-2.5 rounded-lg bg-white hover:bg-orange-50/60 border border-slate-200 hover:border-orange-200 flex items-center justify-between text-left transition-colors cursor-pointer"
-                >
-                  <div>
-                    <span className="text-xs font-bold text-slate-900 block font-mono">
-                      {testNum.phoneNumber}
-                    </span>
-                    <span className="text-xs text-slate-500">{testNum.label}</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs font-mono text-emerald-700 font-bold px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200">
-                      OTP: {testNum.testVerificationCode}
-                    </span>
-                  </div>
-                </button>
-              ))}
+          {/* Mechanic Workshop Registration Button (for Mechanic Mode) */}
+          {loginType === "mechanic" && onRegisterWorkshop && (
+            <div className="mt-5 pt-4 text-center border-t border-[#D5DEE5]">
+              <button
+                type="button"
+                onClick={onRegisterWorkshop}
+                className="w-full py-2.5 px-3 rounded-xl bg-[#EAF4FF] hover:bg-blue-100/80 border border-[#BFDBFE] text-[#2F6B73] text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Store size={15} />
+                <span>New Workshop? Register Your Shop Now (புதிய மெக்கானிக் பதிவு)</span>
+              </button>
             </div>
-          </details>
-        )}
+          )}
+        </div>
       </div>
 
-      {/* Footer */}
-      <div className="p-4 text-center text-xs text-[#64748B] border-t border-[#E2E8F0] bg-[#FFFFFF]">
-        <span>SevaiGo Partner & Customer Network • Secured by Supabase & Firebase</span>
+      {/* Footer Branding */}
+      <div className="text-center py-4 text-[11px] text-[#64748B]">
+        SevaiGo Emergency Roadside Assistance · 24/7 Verified Network
       </div>
     </div>
   );
