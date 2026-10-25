@@ -111,8 +111,8 @@ export async function POST(request: Request) {
     const pincode = cleanText(body.pincode, 10);
     const email = cleanText(body.email, 120);
     const password = typeof body.password === "string" ? body.password : "";
-    const latitude = Number(body.latitude);
-    const longitude = Number(body.longitude);
+    const latitude = Number(body.latitude !== undefined ? body.latitude : body.lat);
+    const longitude = Number(body.longitude !== undefined ? body.longitude : body.lng);
 
     // Strict validation
     if (shopName.length < 3) {
@@ -173,26 +173,83 @@ export async function POST(request: Request) {
       }
     }
 
-    // Default shop representation
-    let createdShop = {
-      id: `shop-${Date.now()}`,
-      shop_name: shopName,
-      owner_name: ownerName,
-      phone: shopPhone || phone,
-      address: fullAddress,
-      lat: latitude,
-      lng: longitude,
-      services: servicesList,
-      verified: true,
-      created_at: new Date().toISOString(),
-    };
+    let createdShop: any = null;
+    const sparePartsTags = (Array.isArray(body.spareParts) ? body.spareParts : []).map((p: string) => "spare:" + p);
+    const servicesWithSpares = Array.from(new Set([...servicesList, ...sparePartsTags]));
 
-    // 2. Primary: Save to local database `mechanics` table
+    // Check if shop already exists with this phone to update or insert cleanly
+    const { data: existingPhoneShop } = await supabase
+      .from("shops")
+      .select("id")
+      .eq("phone", shopPhone || phone)
+      .maybeSingle();
+
+    let supaRows: any = null;
+    let supaErr: any = null;
+
+    if (existingPhoneShop?.id) {
+      const updateRes = await supabase
+        .from("shops")
+        .update({
+          shop_name: shopName,
+          owner_name: ownerName,
+          address: fullAddress,
+          lat: latitude,
+          lng: longitude,
+          services: servicesWithSpares,
+          verified: true,
+        })
+        .eq("id", existingPhoneShop.id)
+        .select();
+      supaRows = updateRes.data;
+      supaErr = updateRes.error;
+    } else {
+      const insertRes = await supabase
+        .from("shops")
+        .insert({
+          shop_name: shopName,
+          owner_name: ownerName,
+          phone: shopPhone || phone,
+          address: fullAddress,
+          lat: latitude,
+          lng: longitude,
+          services: servicesWithSpares,
+          verified: true,
+        })
+        .select();
+      supaRows = insertRes.data;
+      supaErr = insertRes.error;
+    }
+
+    if (supaErr || !supaRows || !supaRows[0]) {
+      console.error("[RegisterShop API] Supabase persistence failed:", supaErr?.message);
+      return Response.json(
+        {
+          success: false,
+          error: `Could not save workshop to database: ${supaErr?.message || "Database insert error"}. Please try again.`,
+        },
+        { status: 500 }
+      );
+    }
+
+    createdShop = supaRows[0];
+    console.log(`[RegisterShop API] Successfully persisted to Supabase: ${shopName} (ID: ${createdShop.id})`);
+
+    // Ensure owner is tracked in Supabase users table
+    try {
+      const { data: existingSupaUser } = await supabase.from("users").select("id").eq("phone", cleanPhone).maybeSingle();
+      if (!existingSupaUser) {
+        await supabase.from("users").insert({ phone: cleanPhone, name: ownerName });
+      }
+    } catch {}
+
+    // 3. Secondary: Sync to local database `mechanics` table for local queries
     try {
       const slug = `${shopName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-${randomBytes(3).toString("hex")}`;
-      const [insertedLocal] = await db
+      await db
         .insert(mechanics)
         .values({
+          id: createdShop.id,
           slug,
           ownerUserId: activeUserId || `usr_${randomBytes(4).toString("hex")}`,
           shopName,
@@ -219,51 +276,13 @@ export async function POST(request: Request) {
           yearsExperience: Math.max(0, Math.round(Number(body.yearsExperience) || 5)),
           spareParts: Array.isArray(body.spareParts) ? body.spareParts : [],
         })
-        .returning()
-        .catch(() => []);
-
-      if (insertedLocal) {
-        createdShop.id = insertedLocal.id;
-      }
+        .onConflictDoNothing()
+        .catch(() => {});
     } catch (localDbErr: any) {
-      console.warn("[RegisterShop API] Local mechanics insert note:", localDbErr?.message);
+      console.warn("[RegisterShop API] Local mechanics cache note:", localDbErr?.message);
     }
 
-    // 3. Supabase Cloud Sync (with safe 4-second timeout to prevent network hang or fetch failed crash)
-    try {
-      const sparePartsTags = (Array.isArray(body.spareParts) ? body.spareParts : []).map((p: string) => "spare:" + p);
-      const servicesWithSpares = Array.from(new Set([...servicesList, ...sparePartsTags]));
-
-      const supaInsertPromise = supabase
-        .from("shops")
-        .insert({
-          shop_name: shopName,
-          owner_name: ownerName,
-          phone: shopPhone || phone,
-          address: fullAddress,
-          lat: latitude,
-          lng: longitude,
-          services: servicesWithSpares,
-          verified: true,
-        })
-        .select();
-
-      const timeoutPromise = new Promise<{ data: null; error: any }>((resolve) =>
-        setTimeout(() => resolve({ data: null, error: new Error("Supabase insert timeout") }), 4000)
-      );
-
-      const res = await Promise.race([supaInsertPromise, timeoutPromise]);
-      if (res.data && res.data[0]) {
-        createdShop = res.data[0];
-        console.log(`[RegisterShop API] Successfully synced to Supabase: ${shopName} (ID: ${createdShop.id})`);
-      } else if (res.error) {
-        console.warn("[RegisterShop API] Supabase sync note (saved locally):", res.error.message || res.error);
-      }
-    } catch (supaErr: any) {
-      console.warn("[RegisterShop API] Supabase connection bypass (shop registered locally):", supaErr?.message);
-    }
-
-    console.log(`[RegisterShop API] Workshop registered successfully: ${shopName} (${phone})`);
+    console.log(`[RegisterShop API] Workshop registration verified and saved: ${shopName} (${phone})`);
 
     return Response.json({
       success: true,
@@ -290,13 +309,32 @@ export async function PATCH(request: Request) {
     }
 
     const id = body.id;
+    if (!id) {
+      return Response.json({ success: false, error: "Shop ID is required for updates." }, { status: 400 });
+    }
+
+    // Authorization check: User must be the registered owner of this shop
+    const sessionUser = await getSessionUser().catch(() => null);
+    const requesterPhone = (sessionUser?.phone || body.phone || "").replace(/\D/g, "");
+    if (!requesterPhone) {
+      return Response.json({ success: false, error: "Authentication required to update workshop." }, { status: 401 });
+    }
+
+    const { data: targetShop } = await supabase.from("shops").select("phone").eq("id", id).maybeSingle();
+    if (targetShop) {
+      const cleanShopPhone = targetShop.phone.replace(/\D/g, "");
+      if (!cleanShopPhone.endsWith(requesterPhone.slice(-10)) && !requesterPhone.endsWith(cleanShopPhone.slice(-10))) {
+        return Response.json({ success: false, error: "Unauthorized: You can only edit your own registered workshop." }, { status: 403 });
+      }
+    }
+
     const shopName = body.shopName ? cleanText(body.shopName, 120) : undefined;
     const ownerName = body.ownerName ? cleanText(body.ownerName, 80) : undefined;
     const phone = body.phone ? cleanText(body.phone, 20) : undefined;
     const shopPhone = body.shopPhone ? cleanText(body.shopPhone, 20) : undefined;
     const address = body.address ? cleanText(body.address, 250) : undefined;
-    const latitude = body.latitude !== undefined ? Number(body.latitude) : undefined;
-    const longitude = body.longitude !== undefined ? Number(body.longitude) : undefined;
+    const latitude = body.latitude !== undefined && Number.isFinite(Number(body.latitude)) ? Number(body.latitude) : undefined;
+    const longitude = body.longitude !== undefined && Number.isFinite(Number(body.longitude)) ? Number(body.longitude) : undefined;
     const services = Array.isArray(body.services) ? body.services : undefined;
 
     const supaUpdates: Record<string, any> = {};
@@ -308,26 +346,14 @@ export async function PATCH(request: Request) {
     if (longitude !== undefined) supaUpdates.lng = longitude;
     if (services) supaUpdates.services = services;
 
-    // Try Supabase update with safe timeout
-    try {
-      if (id) {
-        await Promise.race([
-          supabase.from("shops").update(supaUpdates).eq("id", id),
-          new Promise((resolve) => setTimeout(resolve, 3500)),
-        ]);
-      } else if (phone) {
-        await Promise.race([
-          supabase.from("shops").update(supaUpdates).eq("phone", phone),
-          new Promise((resolve) => setTimeout(resolve, 3500)),
-        ]);
-      }
-    } catch (supaErr: any) {
-      console.warn("[RegisterShop API] PATCH Supabase warning:", supaErr?.message);
+    const { error: updErr } = await supabase.from("shops").update(supaUpdates).eq("id", id);
+    if (updErr) {
+      return Response.json({ success: false, error: "Failed to update workshop in database." }, { status: 500 });
     }
 
     return Response.json({ success: true, message: "Workshop updated successfully!" });
   } catch (err: any) {
     console.error("[RegisterShop API] Unexpected PATCH error:", err?.message);
-    return Response.json({ success: true, message: "Workshop updated successfully!" });
+    return Response.json({ success: false, error: "Workshop update failed." }, { status: 500 });
   }
 }

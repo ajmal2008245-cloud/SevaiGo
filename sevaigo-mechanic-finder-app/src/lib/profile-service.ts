@@ -95,38 +95,70 @@ export async function getOrVerifyProfile(
     console.warn("[ProfileService] Supabase profiles query notice (using local fallback):", supaErr?.message);
   }
 
-  // 2. Synchronize with local `users` table for session persistence
-  try {
-    const userEmail = `${phone}@sevaigo.local`;
-    const [existingLocal] = await db.select().from(users).where(eq(users.phone, phone)).limit(1);
+    // 2. Persist customer/mechanic into Supabase 'users' table
+    try {
+      const { data: supaUser } = await supabase
+        .from("users")
+        .select("*")
+        .eq("phone", phone)
+        .maybeSingle();
 
-    if (existingLocal) {
-      // If Supabase profile table is still pending migration, enforce role from local DB
-      if (!profile.createdAt && existingLocal.role) {
-        profile.role = existingLocal.role === "mechanic" ? "mechanic" : "customer";
-        profile.name = existingLocal.name || profile.name;
+      if (!supaUser) {
+        const { data: insertedU } = await supabase
+          .from("users")
+          .insert({
+            phone,
+            name: profile.name,
+          })
+          .select()
+          .maybeSingle();
+
+        if (insertedU?.id) {
+          profile.id = insertedU.id;
+        }
+        console.log(`[ProfileService] Persisted user ${phone} (${profile.name}) to Supabase users table.`);
+      } else if (supaUser.id) {
+        profile.id = supaUser.id;
+        if (profile.name && profile.name !== supaUser.name && !supaUser.name.startsWith("Rider ")) {
+          await supabase
+            .from("users")
+            .update({ name: profile.name })
+            .eq("id", supaUser.id);
+        }
       }
-      // Keep local user updated with verified role
-      await db
-        .update(users)
-        .set({
-          name: profile.name,
-          role: profile.role,
-        })
-        .where(eq(users.id, existingLocal.id));
-    } else {
-      // Create local user record
-      await db.insert(users).values({
-        name: profile.name,
-        email: userEmail,
-        phone,
-        role: profile.role,
-        passwordHash: "otp_authenticated",
-      }).catch(() => {});
+    } catch (uErr: any) {
+      console.warn("[ProfileService] Supabase users sync notice:", uErr?.message);
     }
-  } catch (localDbErr: any) {
-    console.warn("[ProfileService] Local DB sync note:", localDbErr?.message);
-  }
+
+    // 3. Synchronize with local `users` table for session persistence
+    try {
+      const userEmail = `${phone}@sevaigo.local`;
+      const [existingLocal] = await db.select().from(users).where(eq(users.phone, phone)).limit(1);
+
+      if (existingLocal) {
+        if (!profile.createdAt && existingLocal.role) {
+          profile.role = existingLocal.role === "mechanic" ? "mechanic" : "customer";
+          profile.name = existingLocal.name || profile.name;
+        }
+        await db
+          .update(users)
+          .set({
+            name: profile.name,
+            role: profile.role,
+          })
+          .where(eq(users.id, existingLocal.id));
+      } else {
+        await db.insert(users).values({
+          name: profile.name,
+          email: userEmail,
+          phone,
+          role: profile.role,
+          passwordHash: "otp_authenticated",
+        }).catch(() => {});
+      }
+    } catch (localDbErr: any) {
+      console.warn("[ProfileService] Local DB sync note:", localDbErr?.message);
+    }
 
   return profile;
 }

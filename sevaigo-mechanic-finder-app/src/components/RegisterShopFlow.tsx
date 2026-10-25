@@ -165,8 +165,10 @@ export default function RegisterShopFlow({
             const servicesList = Array.isArray(matched.services) ? matched.services : [];
             const shopCity = matched.city || "";
             const shopPincode = matched.pincode || "";
-            const shopLat = Number(matched.lat ?? matched.latitude ?? 11.4550);
-            const shopLng = Number(matched.lng ?? matched.longitude ?? 77.4240);
+            const rawShopLat = Number(matched.lat ?? matched.latitude);
+            const rawShopLng = Number(matched.lng ?? matched.longitude);
+            const shopLat = Number.isFinite(rawShopLat) ? rawShopLat : 13.0827;
+            const shopLng = Number.isFinite(rawShopLng) ? rawShopLng : 80.2707;
 
             setExistingShop({
               id: matched.id,
@@ -220,8 +222,10 @@ export default function RegisterShopFlow({
         const data = await res.json().catch(() => null);
         if (data?.shop) {
           const s = data.shop;
-          const sLat = Number(s.latitude || 11.4550);
-          const sLng = Number(s.longitude || 77.4240);
+          const rawSLat = Number(s.latitude);
+          const rawSLng = Number(s.longitude);
+          const sLat = Number.isFinite(rawSLat) ? rawSLat : 13.0827;
+          const sLng = Number.isFinite(rawSLng) ? rawSLng : 80.2707;
           setExistingShop({
             ...s,
             latitude: sLat,

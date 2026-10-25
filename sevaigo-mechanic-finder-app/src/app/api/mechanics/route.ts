@@ -163,9 +163,9 @@ export async function POST(request: Request) {
     closeTime,
     photos: photos.length ? photos : ["/images/workshop-1.jpg"],
     ownerPhoto: validImageUrl(body.ownerPhoto) || "/images/owner-1.jpg",
-    isVerified: false,
-    approvalStatus: "pending",
-    availabilityStatus: "free",
+    isVerified: true,
+    approvalStatus: "approved",
+    availabilityStatus: "available",
     priceMin,
     priceMax,
     yearsExperience,
@@ -177,36 +177,49 @@ export async function POST(request: Request) {
     await db.update(users).set({ role: "owner" }).where(eq(users.id, user.id));
   }
 
+  // Persist directly to Supabase shops table
+  const servicesList = Array.from(new Set([...vehicleTypes, ...specializations]));
+  const fullAddress = address + (city ? `, ${city}` : "") + (pincode ? ` - ${pincode}` : "");
+  const { data: supaShop, error: supaErr } = await supabase.from("shops").insert({
+    shop_name: shopName,
+    owner_name: ownerName,
+    phone: shopPhone || phone,
+    address: fullAddress,
+    lat: latitude,
+    lng: longitude,
+    services: servicesList,
+    verified: true,
+  }).select().single();
+
+  if (supaErr || !supaShop) {
+    console.error("Failed to persist mechanic to Supabase in API:", supaErr);
+    return apiError(`Failed to save workshop to database: ${supaErr?.message || "Insert error"}`, 500);
+  }
+
+  // Persist owner in Supabase users table
+  try {
+    const { data: exU } = await supabase.from("users").select("id").eq("phone", cleanDigits).maybeSingle();
+    if (!exU) {
+      await supabase.from("users").insert({ phone: cleanDigits, name: ownerName });
+    }
+  } catch {}
+
   await db.insert(notifications).values({
     userId: user.id,
-    title: "Workshop application received",
-    message: `${shopName} has been submitted for review. It will appear on the live map once approved by the SevaiGo team.`,
+    title: "Workshop registered",
+    message: `${shopName} has been verified and registered. It is now visible on the live map within 7 km.`,
   });
-
-  // Sync to Supabase shops table
-  try {
-    await supabase.from('shops').insert({
-      shop_name: shopName,
-      owner_name: ownerName,
-      phone: shopPhone || phone,
-      address: address + (city ? `, ${city}` : "") + (pincode ? ` - ${pincode}` : ""),
-      lat: latitude,
-      lng: longitude,
-      services: Array.from(new Set([...vehicleTypes, ...specializations])),
-      verified: true,
-    });
-  } catch (err) {
-    console.error("Failed to sync mechanic to Supabase in API:", err);
-  }
 
   return Response.json({
     success: true,
     shop: {
-      id: shop.id,
-      shopName: shop.shopName,
-      ownerName: shop.ownerName,
-      approvalStatus: shop.approvalStatus,
-      isVerified: shop.isVerified,
+      id: supaShop.id,
+      shopName: supaShop.shop_name,
+      ownerName: supaShop.owner_name,
+      approvalStatus: "approved",
+      isVerified: true,
+      latitude: supaShop.lat,
+      longitude: supaShop.lng,
     },
     user,
   }, { status: 201 });

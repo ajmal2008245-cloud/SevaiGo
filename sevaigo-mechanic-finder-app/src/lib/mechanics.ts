@@ -4,7 +4,6 @@ import { mechanics } from "@/db/schema";
 import { ensureSeed } from "@/lib/seed";
 import { type MechanicView } from "@/lib/mechanic-shared";
 import { supabase } from "@/lib/supabaseClient";
-import { INITIAL_MECHANICS } from "@/db/initialData";
 export { DEMO_LOCATION } from "@/lib/mechanic-shared";
 export type { MechanicView } from "@/lib/mechanic-shared";
 
@@ -139,10 +138,23 @@ export async function getNearbyMechanics(query: MechanicQuery): Promise<Mechanic
       .lte("lng", userLng + lngDelta);
 
     if (!supaErr && supaRows && supaRows.length > 0) {
-      const supaShops: MechanicView[] = supaRows
-        .map((row: any) => {
-          const lat = Number(row.lat ?? row.latitude ?? userLat);
-          const lng = Number(row.lng ?? row.longitude ?? userLng);
+      const validRows = supaRows.filter((row: any) => {
+        const lat = Number(row.lat ?? row.latitude);
+        const lng = Number(row.lng ?? row.longitude);
+        return (
+          Number.isFinite(lat) &&
+          Number.isFinite(lng) &&
+          lat >= -90 &&
+          lat <= 90 &&
+          lng >= -180 &&
+          lng <= 180
+        );
+      });
+
+      const supaShops: MechanicView[] = validRows
+        .map((row: any): MechanicView => {
+          const lat = Number(row.lat ?? row.latitude);
+          const lng = Number(row.lng ?? row.longitude);
           const dist = distanceKm(userLat, userLng, lat, lng);
           const rawServices: string[] = Array.isArray(row.services) ? row.services : [];
           const vTypes = rawServices.filter((s: string) =>
@@ -192,44 +204,12 @@ export async function getNearbyMechanics(query: MechanicQuery): Promise<Mechanic
         );
 
       supaShops.sort((a, b) => a.distanceKm - b.distanceKm);
-
-      if (supaShops.length > 0) {
-        return supaShops;
-      }
+      return supaShops;
     }
   } catch (err) {
-    console.warn("[SevaiGo] Supabase bounding box query error, checking local DB:", err);
+    console.warn("[SevaiGo] Supabase bounding box query error:", err);
   }
 
-  // 2. Secondary fallback: Local DB verified mechanics
-  let rows: MechanicRow[] = [];
-  try {
-    if (query.includeUnapproved) {
-      rows = (await db.select().from(mechanics)) as MechanicRow[];
-    } else {
-      rows = (await db.select().from(mechanics).where(and(
-        eq(mechanics.isVerified, true),
-        eq(mechanics.approvalStatus, "approved")
-      ))) as MechanicRow[];
-    }
-  } catch (err) {
-    console.warn("[SevaiGo] Local DB query note:", err);
-  }
-
-  const shops: MechanicView[] = rows
-    .map((row: MechanicRow) => toMechanicView(row, query.latitude, query.longitude))
-    .filter((shop: MechanicView) => shop.distanceKm <= radius)
-    .filter((shop: MechanicView) => matchesVehicleType(shop.vehicleTypes, query.vehicleType))
-    .filter((shop: MechanicView) => matchesProblem(shop.specializations, query.problem))
-    .filter(
-      (shop: MechanicView) =>
-        !term ||
-        `${shop.shopName} ${shop.address} ${shop.specializations.join(" ")}`.toLowerCase().includes(term)
-    )
-    .filter((shop: MechanicView) => !query.openOnly || shop.isOpen)
-    .filter((shop: MechanicView) => !query.availableOnly || shop.availabilityStatus === "available");
-
-  shops.sort((a: MechanicView, b: MechanicView) => a.distanceKm - b.distanceKm);
-
-  return shops;
+  // Strict production behavior: return empty array when no real shops match. Never return fake listings.
+  return [];
 }

@@ -187,10 +187,23 @@ export default function CustomerDashboard({
       if (error) throw error;
 
       if (data) {
-        const mapped: MechanicView[] = data
-          .map((item: any) => {
-            const shopLat = Number(item.lat ?? item.latitude) || DEMO_LOCATION.latitude;
-            const shopLng = Number(item.lng ?? item.longitude) || DEMO_LOCATION.longitude;
+        const validItems = (data || []).filter((item: any) => {
+          const shopLat = Number(item.lat ?? item.latitude);
+          const shopLng = Number(item.lng ?? item.longitude);
+          return (
+            Number.isFinite(shopLat) &&
+            Number.isFinite(shopLng) &&
+            shopLat >= -90 &&
+            shopLat <= 90 &&
+            shopLng >= -180 &&
+            shopLng <= 180
+          );
+        });
+
+        const mapped: MechanicView[] = validItems
+          .map((item: any): MechanicView => {
+            const shopLat = Number(item.lat ?? item.latitude);
+            const shopLng = Number(item.lng ?? item.longitude);
             const dist = distanceKm(userLat, userLng, shopLat, shopLng);
             const services: string[] = Array.isArray(item.services) ? item.services : [];
             const vTypes = services.filter((s: string) =>
@@ -1321,7 +1334,7 @@ export default function CustomerDashboard({
                 </div>
               )}
 
-              {/* No Mechanics within 7 km Fallback */}
+              {/* No Mechanics within 7 km Informational State */}
               {!loadingShops && mechanicsWithin7km.length === 0 && (
                 <div className="p-6 rounded-2xl bg-[#EAF4FF] border border-[#BFDBFE] text-center space-y-3">
                   <div className="w-12 h-12 rounded-xl bg-white text-[#2F6B73] flex items-center justify-center mx-auto border border-[#BFDBFE]">
@@ -1329,11 +1342,43 @@ export default function CustomerDashboard({
                   </div>
                   <div>
                     <h3 className="text-sm font-extrabold text-[#172033]">
-                      No registered mechanics within 7 km
+                      No partner workshops within 7 km
                     </h3>
                     <p className="text-xs text-[#64748B] mt-1 max-w-sm mx-auto leading-relaxed">
-                      We only show real registered workshops that can reach your location. Currently, no partner garage is within 7 km of your GPS.
+                      We strictly show genuine, verified mechanics. Currently, no registered workshop is within 7 km of <span className="font-semibold text-slate-800">{locationLabel}</span> ({latitude.toFixed(4)}, {longitude.toFixed(4)}).
                     </p>
+                  </div>
+                  <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const annaLat = 13.0827;
+                        const annaLng = 80.2707;
+                        setLatitude(annaLat);
+                        setLongitude(annaLng);
+                        setLocationLabel("Anna Salai, Chennai");
+                        loadRegisteredMechanics(annaLat, annaLng);
+                        say("Switched to Anna Salai (Ajmal Workshop area)");
+                      }}
+                      className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 border border-[#BFDBFE] text-xs font-bold text-[#2F6B73] cursor-pointer shadow-xs transition-colors"
+                    >
+                      View Anna Salai, Chennai (Ajmal Workshop)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const chromeLat = 12.9516;
+                        const chromeLng = 80.1462;
+                        setLatitude(chromeLat);
+                        setLongitude(chromeLng);
+                        setLocationLabel("Chromepet, Chennai");
+                        loadRegisteredMechanics(chromeLat, chromeLng);
+                        say("Switched to Chromepet (Speed Wings Auto Care area)");
+                      }}
+                      className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 border border-[#BFDBFE] text-xs font-bold text-[#2F6B73] cursor-pointer shadow-xs transition-colors"
+                    >
+                      View Chromepet, Chennai (Speed Wings)
+                    </button>
                   </div>
                 </div>
               )}

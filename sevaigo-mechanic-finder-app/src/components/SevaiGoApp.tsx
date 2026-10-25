@@ -283,9 +283,22 @@ export default function SevaiGoApp({
           .order("created_at", { ascending: false });
 
         if (!supaErr && supaRows && supaRows.length > 0) {
-          const mappedShops: MechanicView[] = supaRows.map((row: any) => {
-            const lat = Number(row.lat ?? row.latitude ?? DEMO_LOCATION.latitude);
-            const lng = Number(row.lng ?? row.longitude ?? DEMO_LOCATION.longitude);
+          const validRows = supaRows.filter((row: any) => {
+            const lat = Number(row.lat ?? row.latitude);
+            const lng = Number(row.lng ?? row.longitude);
+            return (
+              Number.isFinite(lat) &&
+              Number.isFinite(lng) &&
+              lat >= -90 &&
+              lat <= 90 &&
+              lng >= -180 &&
+              lng <= 180
+            );
+          });
+
+          const mappedShops: MechanicView[] = validRows.map((row: any): MechanicView => {
+            const lat = Number(row.lat ?? row.latitude);
+            const lng = Number(row.lng ?? row.longitude);
             const radVal = Math.PI / 180;
             const dLat = (lat - position.latitude) * radVal;
             const dLon = (lng - position.longitude) * radVal;

@@ -4,6 +4,7 @@ import { breakdowns, mechanics, notifications } from "@/db/schema";
 import { apiError, cleanText } from "@/lib/api";
 import { getSessionUser } from "@/lib/auth";
 import { supabase } from "@/lib/supabaseClient";
+import { distanceKm } from "@/lib/mechanics";
 
 export const dynamic = "force-dynamic";
 
@@ -39,12 +40,54 @@ export async function GET(request: Request) {
       createdAt: breakdowns.createdAt,
       updatedAt: breakdowns.updatedAt,
     }).from(breakdowns)
-      .innerJoin(mechanics, eq(breakdowns.mechanicId, mechanics.id))
+      .leftJoin(mechanics, eq(breakdowns.mechanicId, mechanics.id))
       .where(eq(breakdowns.id, requestId))
-      .limit(1);
+      .limit(1)
+      .catch(() => []);
 
-    if (!item) return apiError("Rescue request not found.", 404);
-    return Response.json({ breakdown: item });
+    if (item) {
+      return Response.json({ breakdown: item });
+    }
+
+    // Check Supabase 'rescue_requests'
+    try {
+      const { data: supaReq } = await supabase
+        .from("rescue_requests")
+        .select("*")
+        .eq("id", requestId)
+        .maybeSingle();
+
+      if (supaReq) {
+        return Response.json({
+          breakdown: {
+            id: supaReq.id,
+            mechanicId: "supa-mechanic",
+            shopName: "Emergency Mechanic",
+            shopPhone: "",
+            shopAddress: "",
+            action: "requested",
+            issue: supaReq.problem,
+            status: supaReq.status,
+            vehicleType: supaReq.vehicle_type,
+            userName: "Customer",
+            userPhone: supaReq.user_phone,
+            address: "",
+            notes: null,
+            photoUrl: null,
+            spareParts: null,
+            latitude: supaReq.lat,
+            longitude: supaReq.lng,
+            mechanicLat: null,
+            mechanicLng: null,
+            etaMinutes: 15,
+            createdAt: supaReq.created_at,
+            updatedAt: supaReq.created_at,
+          },
+        });
+      }
+    } catch {}
+
+    return apiError("Rescue request not found.", 404);
   }
 
   if (mode === "incoming") {
@@ -106,8 +149,60 @@ export async function GET(request: Request) {
       return Response.json({ breakdowns: [], shop: null });
     }
 
+    // Query real incoming requests from Supabase 'rescue_requests'
+    let supaBreakdowns: any[] = [];
     try {
-      const items = await db.select({
+      const { data: supaReqs } = await supabase
+        .from("rescue_requests")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(25);
+
+      if (supaReqs && supaReqs.length > 0) {
+        const cleanShopPhone = (targetShop.phone || "").replace(/\D/g, "");
+        const shopNameLower = (targetShop.shopName || targetShop.shop_name || "").toLowerCase();
+
+        supaBreakdowns = supaReqs
+          .filter((sr: any) => {
+            const prob = (sr.problem || "").toLowerCase();
+            const matchesPhone = cleanShopPhone.length >= 10 && prob.includes(cleanShopPhone.slice(-10));
+            const matchesName = shopNameLower.length >= 3 && prob.includes(shopNameLower);
+            let within7 = false;
+            if (Number.isFinite(targetShop.latitude) && Number.isFinite(targetShop.longitude) && Number.isFinite(sr.lat) && Number.isFinite(sr.lng)) {
+              const d = distanceKm(targetShop.latitude, targetShop.longitude, sr.lat, sr.lng);
+              if (d <= 7.0) within7 = true;
+            }
+            return matchesPhone || matchesName || within7;
+          })
+          .map((sr: any) => ({
+            id: sr.id,
+            mechanicId: targetShop.id,
+            shopName: targetShop.shopName || targetShop.shop_name,
+            action: "requested",
+            issue: sr.problem,
+            status: sr.status || "pending",
+            vehicleType: sr.vehicle_type || "2w",
+            userName: "Verified Customer",
+            userPhone: sr.user_phone,
+            address: `GPS: ${Number(sr.lat).toFixed(4)}, ${Number(sr.lng).toFixed(4)}`,
+            notes: null,
+            photoUrl: null,
+            spareParts: null,
+            latitude: sr.lat,
+            longitude: sr.lng,
+            mechanicLat: targetShop.latitude,
+            mechanicLng: targetShop.longitude,
+            etaMinutes: 15,
+            createdAt: sr.created_at,
+            updatedAt: sr.created_at,
+          }));
+      }
+    } catch (err) {
+      console.warn("[Breakdowns API] Incoming Supabase query warning:", err);
+    }
+
+    try {
+      const localItems = await db.select({
         id: breakdowns.id,
         mechanicId: breakdowns.mechanicId,
         shopName: mechanics.shopName,
@@ -134,9 +229,17 @@ export async function GET(request: Request) {
         .orderBy(desc(breakdowns.createdAt))
         .limit(50);
 
-      return Response.json({ breakdowns: items, shop: targetShop });
+      // Merge and deduplicate by ID
+      const seenIds = new Set<string>();
+      const combined = [...supaBreakdowns, ...localItems].filter((b) => {
+        if (!b.id || seenIds.has(b.id)) return false;
+        seenIds.add(b.id);
+        return true;
+      });
+
+      return Response.json({ breakdowns: combined, shop: targetShop });
     } catch (dbErr) {
-      return Response.json({ breakdowns: [], shop: targetShop });
+      return Response.json({ breakdowns: supaBreakdowns, shop: targetShop });
     }
   }
 
@@ -176,7 +279,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
-  const rawMechanicId = typeof body?.mechanicId === "string" ? body.mechanicId.trim() : "";
+  const rawMechanicId = typeof (body?.mechanicId ?? body?.mechanic_id) === "string" 
+    ? (body.mechanicId ?? body.mechanic_id).trim() 
+    : String(body?.mechanicId ?? body?.mechanic_id ?? "").trim();
   if (!rawMechanicId) return apiError("Workshop identifier required.");
 
   let [shop] = await db.select().from(mechanics).where(eq(mechanics.id, rawMechanicId)).limit(1).catch(() => []);
@@ -188,9 +293,9 @@ export async function POST(request: Request) {
       if (supaShop && supaShop[0]) {
         shop = {
           id: String(supaShop[0].id),
-          shopName: supaShop[0].shop_name,
-          phone: supaShop[0].phone,
-          address: supaShop[0].address,
+          shopName: supaShop[0].shop_name || supaShop[0].name || "Mechanic Workshop",
+          phone: supaShop[0].phone || "",
+          address: supaShop[0].address || "",
           latitude: Number(supaShop[0].lat),
           longitude: Number(supaShop[0].lng),
           ownerUserId: null,
@@ -204,11 +309,22 @@ export async function POST(request: Request) {
   const rawLng = body.longitude !== undefined ? body.longitude : body.lng;
   const lat = Number(rawLat);
   const lng = Number(rawLng);
-  const action = body.action === "navigate" ? "navigated" : body.action === "request" ? "requested" : "called";
-  const issue = cleanText(body.issue, 120) || "Roadside assistance";
-  const vehicleType = cleanText(body.vehicleType, 50) || "2w";
-  const userName = cleanText(body.userName || user?.name || "Rider in Need", 80);
-  const userPhone = cleanText(body.userPhone || user?.phone || "", 20);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return apiError("Exact breakdown GPS coordinates are required to dispatch nearest mechanic.", 400);
+  }
+
+  const action = body.action === "navigate" ? "navigated" : body.action === "request" ? "requested" : "requested";
+  const issue = cleanText(body.issue || body.problem, 120) || "Roadside assistance";
+  const vehicleType = cleanText(body.vehicleType || body.vehicle_type, 50) || "2w";
+  const userName = cleanText(body.userName || body.name || user?.name || "Rider in Need", 80);
+  const userPhone = cleanText(body.userPhone || body.user_phone || body.phone || user?.phone || "", 20);
+  const cleanDigits = userPhone.replace(/\D/g, "");
+
+  if (cleanDigits.length < 10) {
+    return apiError("A valid 10-digit mobile number is required to request roadside rescue.", 400);
+  }
+
   const address = cleanText(body.address, 250) || null;
   const notes = cleanText(body.notes, 500) || null;
   const photoUrl = typeof body.photoUrl === "string" && body.photoUrl.length > 5 ? body.photoUrl : null;
@@ -217,13 +333,13 @@ export async function POST(request: Request) {
   const targetMechId = shop ? shop.id : rawMechanicId;
 
   // Deduplication guard: check if duplicate rescue was submitted in last 30 seconds
-  if (action === "requested" && userPhone) {
+  if (action === "requested" && cleanDigits) {
     try {
       const thirtySecondsAgo = new Date(Date.now() - 30000);
       const [existingRecent] = await db.select().from(breakdowns).where(
         and(
           eq(breakdowns.mechanicId, targetMechId),
-          eq(breakdowns.userPhone, userPhone),
+          eq(breakdowns.userPhone, cleanDigits),
           gte(breakdowns.createdAt, thirtySecondsAgo)
         )
       ).limit(1);
@@ -238,7 +354,37 @@ export async function POST(request: Request) {
     } catch {}
   }
 
+  // 1. Primary: Save to Supabase rescue_requests for instant real reach
+  let supaRescueRecord: any = null;
+  if (action === "requested") {
+    try {
+      const shopTitle = shop?.shopName || "Partner Workshop";
+      const shopPhone = shop?.phone || "";
+      const problemDesc = `[Shop: ${shopTitle} | ${shopPhone}] ${issue}${spareParts?.length ? ` (Parts: ${spareParts.join(", ")})` : ""}`;
+      const { data: sRes, error: sErr } = await supabase.from("rescue_requests").insert({
+        user_phone: cleanDigits,
+        vehicle_type: vehicleType,
+        problem: problemDesc,
+        lat: lat,
+        lng: lng,
+        status: "pending",
+      }).select().single();
+
+      if (sRes) {
+        supaRescueRecord = sRes;
+        console.log(`[Breakdowns API] Real rescue request saved to Supabase (ID: ${supaRescueRecord.id})`);
+      } else if (sErr) {
+        console.warn("[Breakdowns API] Supabase rescue_requests insert warning:", sErr.message);
+      }
+    } catch (supaErr) {
+      console.warn("[Breakdowns API] Supabase rescue_requests sync note:", supaErr);
+    }
+  }
+
+  // 2. Secondary: Save to local DB breakdowns table
+  const newBreakdownId = supaRescueRecord?.id || undefined;
   const [record] = await db.insert(breakdowns).values({
+    ...(newBreakdownId ? { id: newBreakdownId } : {}),
     userId: user?.id || null,
     mechanicId: targetMechId,
     action,
@@ -246,43 +392,27 @@ export async function POST(request: Request) {
     issue,
     vehicleType,
     userName,
-    userPhone,
+    userPhone: cleanDigits,
     address,
     notes,
     photoUrl,
     spareParts,
-    latitude: Number.isFinite(lat) && lat >= -90 && lat <= 90 ? lat : null,
-    longitude: Number.isFinite(lng) && lng >= -180 && lng <= 180 ? lng : null,
+    latitude: lat,
+    longitude: lng,
   }).returning().catch(() => []);
-
-  // Sync to Supabase rescue_requests for real-time reach
-  if (action === "requested") {
-    try {
-      await supabase.from("rescue_requests").insert({
-        user_phone: userPhone,
-        vehicle_type: vehicleType,
-        problem: issue,
-        lat: Number.isFinite(lat) && lat >= -90 && lat <= 90 ? lat : 13.0827,
-        lng: Number.isFinite(lng) && lng >= -180 && lng <= 180 ? lng : 80.2707,
-        status: "pending",
-      });
-    } catch (supaErr) {
-      console.warn("[Breakdowns API] Supabase rescue_requests sync note:", supaErr);
-    }
-  }
 
   // If request is made and workshop has an owner, notify the shop owner
   if (action === "requested" && shop?.ownerUserId) {
     await db.insert(notifications).values({
       userId: shop.ownerUserId,
       title: "🚨 New Rescue Request",
-      message: `${userName} requested assistance for ${vehicleType.toUpperCase()} (${issue}). Contact: ${userPhone || "Not provided"}.`,
+      message: `${userName} requested assistance for ${vehicleType.toUpperCase()} (${issue}). Contact: ${cleanDigits}.`,
     }).catch(() => {});
   }
 
   return Response.json({
     success: true,
-    breakdown: record,
+    breakdown: record || supaRescueRecord,
     message: action === "requested" ? "Rescue assistance request sent to mechanic." : "Activity logged.",
   }, { status: 201 });
 }
@@ -311,21 +441,45 @@ export async function PATCH(request: Request) {
     return apiError("Invalid rescue request ID.");
   }
 
-  const [requestRow] = await db.select().from(breakdowns).where(eq(breakdowns.id, id)).limit(1);
-  if (!requestRow) return apiError("Rescue request not found.", 404);
+  // Also sync status update to Supabase rescue_requests
+  try {
+    if (rawStatus && allowedStatuses.includes(rawStatus)) {
+      await supabase.from("rescue_requests").update({ status: rawStatus }).eq("id", id);
+    }
+  } catch (sErr) {
+    console.warn("[Breakdowns API] Supabase rescue_requests status sync note:", sErr);
+  }
+
+  const [requestRow] = await db.select().from(breakdowns).where(eq(breakdowns.id, id)).limit(1).catch(() => []);
+  
+  if (!requestRow) {
+    // If only in Supabase rescue_requests
+    try {
+      const { data: supaRow } = await supabase.from("rescue_requests").select("*").eq("id", id).maybeSingle();
+      if (supaRow) {
+        return Response.json({
+          success: true,
+          breakdown: {
+            id: supaRow.id,
+            status: rawStatus || supaRow.status,
+          },
+          message: "Rescue request status updated.",
+        });
+      }
+    } catch {}
+    return apiError("Rescue request not found.", 404);
+  }
 
   const user = await getSessionUser();
   let isShopOwner = false;
   let shop: any = null;
 
   if (!user) {
-    // Allow guest user who dispatched the request to cancel it
     if (rawStatus !== "cancelled" || requestRow.userId !== null) {
       return apiError("Please sign in.");
     }
   } else {
-    // Check authorization: user must be the shop owner or the user who created it
-    const [foundShop] = await db.select().from(mechanics).where(eq(mechanics.id, requestRow.mechanicId)).limit(1);
+    const [foundShop] = await db.select().from(mechanics).where(eq(mechanics.id, requestRow.mechanicId)).limit(1).catch(() => []);
     shop = foundShop;
     isShopOwner = Boolean(shop && shop.ownerUserId === user.id);
     const isRequestCreator = requestRow.userId === user.id;
@@ -341,7 +495,6 @@ export async function PATCH(request: Request) {
 
   if (rawStatus && allowedStatuses.includes(rawStatus)) {
     updateData.status = rawStatus;
-    // Stop live location sharing if request ends or is cancelled
     if (["completed", "fixed", "cancelled", "declined"].includes(rawStatus)) {
       updateData.mechanicLat = null;
       updateData.mechanicLng = null;
@@ -357,7 +510,6 @@ export async function PATCH(request: Request) {
       updateData.mechanicLat = mLat;
       updateData.mechanicLng = mLng;
 
-      // Compute reliable ETA if customer coordinates are known
       if (requestRow.latitude && requestRow.longitude) {
         const radVal = Math.PI / 180;
         const dLat = (requestRow.latitude - mLat) * radVal;
@@ -373,7 +525,7 @@ export async function PATCH(request: Request) {
     }
   }
 
-  const [updated] = await db.update(breakdowns).set(updateData).where(eq(breakdowns.id, id)).returning();
+  const [updated] = await db.update(breakdowns).set(updateData).where(eq(breakdowns.id, id)).returning().catch(() => []);
 
   // Notify vehicle owner if mechanic updated status
   if (isShopOwner && requestRow.userId && rawStatus) {

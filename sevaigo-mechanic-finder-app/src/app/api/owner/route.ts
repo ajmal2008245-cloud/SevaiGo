@@ -3,20 +3,72 @@ import { db } from "@/db";
 import { mechanics } from "@/db/schema";
 import { apiError, cleanText, validImageUrl } from "@/lib/api";
 import { getSessionUser } from "@/lib/auth";
+import { supabase } from "@/lib/supabaseClient";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const user = await getSessionUser();
   if (!user) return apiError("Please sign in.", 401);
-  const [shop] = await db.select().from(mechanics).where(eq(mechanics.ownerUserId, user.id)).limit(1);
+  let [shop] = await db.select().from(mechanics).where(eq(mechanics.ownerUserId, user.id)).limit(1).catch(() => []);
+  
+  if (!shop && user.phone) {
+    const cleanPhone = user.phone.replace(/\D/g, "");
+    if (cleanPhone.length >= 10) {
+      try {
+        const { data: sRows } = await supabase.from("shops").select("*").limit(50);
+        if (sRows) {
+          const matched = sRows.find((s: any) => {
+            const p = (s.phone || "").replace(/\D/g, "");
+            return p.endsWith(cleanPhone.slice(-10)) || cleanPhone.endsWith(p.slice(-10));
+          });
+          if (matched) {
+            shop = {
+              id: matched.id,
+              shopName: matched.shop_name,
+              ownerName: matched.owner_name,
+              phone: matched.phone,
+              address: matched.address,
+              latitude: Number(matched.lat),
+              longitude: Number(matched.lng),
+              vehicleTypes: ["2w", "4w"],
+              specializations: matched.services || [],
+              openTime: "08:00",
+              closeTime: "21:00",
+              isVerified: matched.verified ?? true,
+              approvalStatus: "approved",
+              availabilityStatus: "available",
+            };
+          }
+        }
+      } catch {}
+    }
+  }
+
   return Response.json({ shop: shop || null });
 }
 
 export async function PATCH(request: Request) {
   const user = await getSessionUser();
   if (!user) return apiError("Please sign in.", 401);
-  const [shop] = await db.select().from(mechanics).where(eq(mechanics.ownerUserId, user.id)).limit(1);
+  let [shop] = await db.select().from(mechanics).where(eq(mechanics.ownerUserId, user.id)).limit(1).catch(() => []);
+
+  if (!shop && user.phone) {
+    const cleanPhone = user.phone.replace(/\D/g, "");
+    if (cleanPhone.length >= 10) {
+      try {
+        const { data: sRows } = await supabase.from("shops").select("*").limit(50);
+        if (sRows) {
+          const matched = sRows.find((s: any) => {
+            const p = (s.phone || "").replace(/\D/g, "");
+            return p.endsWith(cleanPhone.slice(-10)) || cleanPhone.endsWith(p.slice(-10));
+          });
+          if (matched) shop = matched;
+        }
+      } catch {}
+    }
+  }
+
   if (!shop) return apiError("Workshop not found.", 404);
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") return apiError("Invalid request.");
@@ -127,6 +179,22 @@ export async function PATCH(request: Request) {
     if (photos.length) updates.photos = photos;
   }
 
-  const [updated] = await db.update(mechanics).set(updates).where(eq(mechanics.id, shop.id)).returning();
-  return Response.json({ shop: updated });
+  try {
+    const supaUpdates: Record<string, any> = {};
+    if (updates.shopName) supaUpdates.shop_name = updates.shopName;
+    if (updates.ownerName) supaUpdates.owner_name = updates.ownerName;
+    if (updates.phone) supaUpdates.phone = updates.phone;
+    if (updates.address) supaUpdates.address = updates.address;
+    if (updates.latitude !== undefined) supaUpdates.lat = updates.latitude;
+    if (updates.longitude !== undefined) supaUpdates.lng = updates.longitude;
+    if (updates.specializations) supaUpdates.services = updates.specializations;
+    if (Object.keys(supaUpdates).length > 0) {
+      await supabase.from("shops").update(supaUpdates).eq("id", shop.id);
+    }
+  } catch (err) {
+    console.warn("[Owner API] Supabase shops sync note:", err);
+  }
+
+  const [updated] = await db.update(mechanics).set(updates).where(eq(mechanics.id, shop.id)).returning().catch(() => [shop]);
+  return Response.json({ shop: updated || shop });
 }
