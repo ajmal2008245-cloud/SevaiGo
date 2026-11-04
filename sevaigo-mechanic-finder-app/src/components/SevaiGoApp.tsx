@@ -38,6 +38,13 @@ import { t, type Language } from "@/lib/copy";
 import { DEMO_LOCATION, type MechanicView } from "@/lib/mechanic-shared";
 import { cleanPhoneNumber, formatPhoneDisplay, getTelUri, getWhatsAppRescueUri, getWhatsAppUri, isMobileDevice, isValidPhoneNumber } from "@/lib/phone";
 import { supabase } from "@/lib/supabaseClient";
+import {
+  getCurrentGpsPosition,
+  reverseGeocodeCoordinates,
+  saveUserLocation,
+  getSavedUserLocation,
+  getGeolocationPermissionState,
+} from "@/lib/geolocation";
 
 export type View =
   | "splash"
@@ -402,49 +409,66 @@ export default function SevaiGoApp({
   };
 
   const detectLocation = useCallback(
-    (targetView?: View) => {
-      if (typeof window === "undefined" || !navigator.geolocation) {
-        say("GPS location is not supported on this device.");
-        return;
-      }
+    async (targetView?: View, isUserInitiated: boolean = true) => {
       setGeoLoading(true);
-      navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          const lat = Number(pos.coords.latitude.toFixed(6));
-          const lng = Number(pos.coords.longitude.toFixed(6));
-          const areaLabel = await fetchAreaName(lat, lng);
-          const newLoc: MapLocation = {
-            latitude: lat,
-            longitude: lng,
-            label: areaLabel,
-            source: "gps",
-          };
-          setLocation(newLoc);
-          setGeoLoading(false);
-          try {
-            localStorage.setItem("userSavedLocation", JSON.stringify(newLoc));
-          } catch {}
+      if (isUserInitiated) {
+        say("Detecting live GPS coordinates...");
+      }
+
+      try {
+        const pos = await getCurrentGpsPosition();
+        const lat = Number(pos.latitude.toFixed(6));
+        const lng = Number(pos.longitude.toFixed(6));
+
+        let areaLabel = `GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        try {
+          const geo = await reverseGeocodeCoordinates(lat, lng);
+          areaLabel = geo.shortLabel || geo.fullAddress || areaLabel;
+        } catch {}
+
+        const newLoc: MapLocation = {
+          latitude: lat,
+          longitude: lng,
+          label: areaLabel,
+          source: "gps",
+        };
+        setLocation(newLoc);
+        saveUserLocation({
+          latitude: lat,
+          longitude: lng,
+          label: areaLabel,
+          source: "gps",
+        });
+
+        if (isUserInitiated) {
           say(`Live GPS: ${areaLabel}`);
-          if (targetView) setView(targetView);
-          void refreshShops(newLoc);
-        },
-        (err) => {
-          setGeoLoading(false);
-          if (err.code === 1) {
-            say("Please allow Location permission in your browser to detect your live location.");
-          } else {
-            say("Could not acquire GPS coordinates. Tap to retry.");
-          }
-        },
-        { enableHighAccuracy: true, timeout: 12000, maximumAge: 10000 }
-      );
+        }
+        if (targetView) setView(targetView);
+        void refreshShops(newLoc);
+      } catch (err: any) {
+        if (isUserInitiated) {
+          say(err?.message || "Could not acquire GPS coordinates. Tap to retry.");
+        }
+      } finally {
+        setGeoLoading(false);
+      }
     },
     [refreshShops, say]
   );
 
-  // Trigger live GPS detection automatically on initial mount
+  // Trigger live GPS detection automatically on initial mount ONLY if permission is already granted
   useEffect(() => {
-    detectLocation();
+    let isMounted = true;
+    async function initGps() {
+      const perm = await getGeolocationPermissionState();
+      if (perm === "granted" && isMounted) {
+        void detectLocation(undefined, false);
+      }
+    }
+    void initGps();
+    return () => {
+      isMounted = false;
+    };
   }, [detectLocation]);
 
   const initiateCall = useCallback(

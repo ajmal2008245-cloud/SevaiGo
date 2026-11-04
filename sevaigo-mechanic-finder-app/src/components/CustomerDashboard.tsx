@@ -36,8 +36,15 @@ import dynamic from "next/dynamic";
 import HelpModal from "@/components/modals/HelpModal";
 import type { PublicUser } from "@/lib/auth";
 import type { MechanicView } from "@/lib/mechanic-shared";
-import { DEMO_LOCATION } from "@/lib/mechanic-shared";
 import { supabase } from "@/lib/supabaseClient";
+import {
+  getCurrentGpsPosition,
+  reverseGeocodeCoordinates,
+  saveUserLocation,
+  getSavedUserLocation,
+  getGeolocationPermissionState,
+  type GpsErrorInfo,
+} from "@/lib/geolocation";
 
 const MechanicMap = dynamic(() => import("@/components/MechanicMap"), {
   ssr: false,
@@ -109,9 +116,19 @@ export default function CustomerDashboard({
   const [helpOpen, setHelpOpen] = useState(false);
 
   // 1. Current Bike Breakdown Details State
-  const [latitude, setLatitude] = useState<number>(DEMO_LOCATION.latitude);
-  const [longitude, setLongitude] = useState<number>(DEMO_LOCATION.longitude);
-  const [locationLabel, setLocationLabel] = useState<string>("Detecting live GPS location...");
+  const [latitude, setLatitude] = useState<number | null>(() => {
+    const saved = getSavedUserLocation();
+    return saved ? saved.latitude : null;
+  });
+  const [longitude, setLongitude] = useState<number | null>(() => {
+    const saved = getSavedUserLocation();
+    return saved ? saved.longitude : null;
+  });
+  const [locationLabel, setLocationLabel] = useState<string>(() => {
+    const saved = getSavedUserLocation();
+    return saved ? saved.label : "Click 'Detect Location' or search area below";
+  });
+  const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
   const [detectingGps, setDetectingGps] = useState<boolean>(false);
   const [locationSearchQuery, setLocationSearchQuery] = useState<string>("");
   const [isSearchingLocation, setIsSearchingLocation] = useState<boolean>(false);
@@ -129,10 +146,10 @@ export default function CustomerDashboard({
 
   // 4. Real Registered Mechanics from Supabase (Cached)
   const [registeredShops, setRegisteredShops] = useState<MechanicView[]>([]);
-  const [loadingShops, setLoadingShops] = useState<boolean>(true);
+  const [loadingShops, setLoadingShops] = useState<boolean>(false);
   const [submittingRescueId, setSubmittingRescueId] = useState<string | null>(null);
   const [requestedStatus, setRequestedStatus] = useState<string | null>(null);
-  const [locationError, setLocationError] = useState<string | null>(null);
+  const [locationError, setLocationError] = useState<GpsErrorInfo | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
   const shopsCacheRef = useRef<Record<string, MechanicView[]>>({});
 
@@ -267,6 +284,7 @@ export default function CustomerDashboard({
 
   // Supabase Real-time: automatically refresh nearby mechanics when a shop registers/updates
   useEffect(() => {
+    if (latitude === null || longitude === null) return;
     const channel = supabase
       .channel("customer-shops-realtime")
       .on(
@@ -284,73 +302,151 @@ export default function CustomerDashboard({
     };
   }, [latitude, longitude, loadRegisteredMechanics]);
 
-  // Detect current GPS location without blocking mechanic discovery
-  const detectLocation = useCallback(() => {
-    if (!navigator.geolocation) {
-      setLocationError("Geolocation is not supported by this browser.");
-      return;
-    }
-    setDetectingGps(true);
-    setLocationError(null);
+  // Detect current GPS location using high-accuracy + network fallback
+  const detectLocation = useCallback(
+    async (isUserInitiated: boolean = true) => {
+      setDetectingGps(true);
+      setLocationError(null);
+      if (isUserInitiated) {
+        say("Detecting live GPS coordinates from your device...");
+      }
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
+      try {
+        const pos = await getCurrentGpsPosition();
+        const lat = Number(pos.latitude.toFixed(6));
+        const lng = Number(pos.longitude.toFixed(6));
         setLatitude(lat);
         setLongitude(lng);
-        setLocationLabel(`GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
-        setDetectingGps(false);
+        setLocationAccuracy(pos.accuracy);
 
-        // Instantly trigger mechanic discovery at coordinates without waiting for reverse geocode!
+        const tempLabel = `GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        setLocationLabel(tempLabel);
+
+        // Trigger mechanic discovery immediately with real coordinates
         loadRegisteredMechanics(lat, lng);
-        say("Live GPS coordinates detected!");
 
-        // Reverse geocode in background for address label
-        fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`)
-          .then((res) => res.json())
-          .then((data) => {
-            if (data?.display_name) {
-              setLocationLabel(data.display_name);
-            }
-          })
-          .catch(() => {});
-      },
-      (err) => {
+        // Convert coordinates into readable address using reverse geocoding
+        try {
+          const geo = await reverseGeocodeCoordinates(lat, lng);
+          const resolvedAddress = geo.fullAddress || geo.shortLabel || tempLabel;
+          setLocationLabel(resolvedAddress);
+
+          // Save real coordinates & address for subsequent steps
+          saveUserLocation({
+            latitude: lat,
+            longitude: lng,
+            label: resolvedAddress,
+            source: "gps",
+          });
+
+          if (isUserInitiated) {
+            say(`📍 Live GPS detected: ${geo.shortLabel}`);
+          }
+        } catch {
+          saveUserLocation({
+            latitude: lat,
+            longitude: lng,
+            label: tempLabel,
+            source: "gps",
+          });
+          if (isUserInitiated) {
+            say("📍 Live GPS coordinates detected!");
+          }
+        }
+      } catch (err: any) {
+        const errorInfo: GpsErrorInfo =
+          err?.type && err?.title
+            ? err
+            : {
+                type: "unknown",
+                title: "GPS Detection Failed",
+                message: err?.message || "Could not detect your current GPS location.",
+                instructions: [
+                  "Check your device GPS toggle and network connection.",
+                  "Tap 'Retry GPS' below.",
+                  "Or search your area manually or pick on map.",
+                ],
+              };
+
+        setLocationError(errorInfo);
+        if (isUserInitiated) {
+          say(errorInfo.message);
+        }
+      } finally {
         setDetectingGps(false);
-        setLocationError("GPS location access was denied. Please allow location in your browser or search your breakdown area below.");
-        // Still load current coordinates without freezing
-        loadRegisteredMechanics(latitude, longitude);
-      },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
-    );
-  }, [loadRegisteredMechanics, latitude, longitude, say]);
+      }
+    },
+    [loadRegisteredMechanics, say]
+  );
 
+  // Initial mount: load saved location, or if browser permission is already granted, refresh GPS silently
   useEffect(() => {
-    detectLocation();
-  }, [detectLocation]);
+    let isMounted = true;
+    async function initLocation() {
+      const saved = getSavedUserLocation();
+      if (saved && isMounted) {
+        setLatitude(saved.latitude);
+        setLongitude(saved.longitude);
+        setLocationLabel(saved.label);
+        loadRegisteredMechanics(saved.latitude, saved.longitude);
+      }
+
+      const permState = await getGeolocationPermissionState();
+      if (permState === "granted" && isMounted) {
+        void detectLocation(false);
+      }
+    }
+
+    void initLocation();
+    return () => {
+      isMounted = false;
+    };
+  }, [detectLocation, loadRegisteredMechanics]);
 
   // Autocomplete Area Search
   const handleSearchLocation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!locationSearchQuery.trim()) return;
     setIsSearchingLocation(true);
+    setLocationError(null);
 
     try {
-      const q = encodeURIComponent(locationSearchQuery.trim() + ", Tamil Nadu, India");
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`);
-      const data = await res.json();
+      const res = await fetch(`/api/geocode/search?q=${encodeURIComponent(locationSearchQuery.trim())}`);
+      const json = await res.json().catch(() => ({}));
+      const results = json?.results || [];
 
-      if (data && data.length > 0) {
-        const newLat = parseFloat(data[0].lat);
-        const newLng = parseFloat(data[0].lon);
-        setLatitude(newLat);
-        setLongitude(newLng);
-        setLocationLabel(data[0].display_name);
-        loadRegisteredMechanics(newLat, newLng);
-        say(`Location synchronized: ${data[0].display_name.slice(0, 35)}...`);
+      if (results.length > 0) {
+        const top = results[0];
+        setLatitude(top.latitude);
+        setLongitude(top.longitude);
+        const label = top.displayName || top.shortLabel;
+        setLocationLabel(label);
+        saveUserLocation({
+          latitude: top.latitude,
+          longitude: top.longitude,
+          label,
+          source: "search",
+        });
+        loadRegisteredMechanics(top.latitude, top.longitude);
+        say(`📍 Location set: ${top.shortLabel || label.slice(0, 30)}`);
       } else {
-        say("Area not found. Please try another nearby landmark or town.");
+        // Fallback to direct Nominatim if API route returned empty
+        const q = encodeURIComponent(locationSearchQuery.trim() + ", India");
+        const directRes = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=jsonv2&limit=1`);
+        const directData = await directRes.json();
+        if (directData && directData.length > 0) {
+          const lat = parseFloat(directData[0].lat);
+          const lng = parseFloat(directData[0].lon);
+          const label = directData[0].display_name;
+          setLatitude(lat);
+          setLongitude(lng);
+          setLocationLabel(label);
+          saveUserLocation({ latitude: lat, longitude: lng, label, source: "search" });
+          loadRegisteredMechanics(lat, lng);
+          say(`📍 Location set: ${label.slice(0, 30)}`);
+        } else {
+          say("Area not found. Please try another nearby landmark, town, or pincode.");
+        }
       }
     } catch {
       say("Network error while searching location. Please retry.");
@@ -359,12 +455,33 @@ export default function CustomerDashboard({
     }
   };
 
-  const handlePickBreakdownSpot = (coords: { latitude: number; longitude: number }) => {
+  const handlePickBreakdownSpot = async (coords: { latitude: number; longitude: number }) => {
     setLatitude(coords.latitude);
     setLongitude(coords.longitude);
-    setLocationLabel(`Pinned Spot: ${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`);
+    setLocationError(null);
+    const tempLabel = `Pinned Spot: ${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}`;
+    setLocationLabel(tempLabel);
     loadRegisteredMechanics(coords.latitude, coords.longitude);
     say("Breakdown spot pinned on map!");
+
+    try {
+      const geo = await reverseGeocodeCoordinates(coords.latitude, coords.longitude);
+      const label = geo.fullAddress || geo.shortLabel || tempLabel;
+      setLocationLabel(label);
+      saveUserLocation({
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        label,
+        source: "manual",
+      });
+    } catch {
+      saveUserLocation({
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        label: tempLabel,
+        source: "manual",
+      });
+    }
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -390,6 +507,10 @@ export default function CustomerDashboard({
 
   // WhatsApp Rescue Dispatch
   const triggerWhatsAppRescue = (shop: MechanicView) => {
+    if (latitude === null || longitude === null) {
+      say("Please detect your GPS location or set breakdown spot first.");
+      return;
+    }
     const phoneClean = shop.whatsapp || shop.phone || "9876543210";
     const sparePartsText =
       selectedSpareParts.length > 0 ? `\n*Requested Spare Parts:* ${selectedSpareParts.join(", ")}` : "";
@@ -412,6 +533,10 @@ export default function CustomerDashboard({
 
   // Submit Rescue Request
   const submitRescueRequest = async (shop: MechanicView) => {
+    if (latitude === null || longitude === null) {
+      say("Please detect your GPS location or set breakdown spot first.");
+      return;
+    }
     setSubmittingRescueId(shop.id);
     const initialDist = Math.round(distanceKm(latitude, longitude, shop.latitude, shop.longitude) * 10) / 10;
     const initialEta = Math.max(2, Math.round(initialDist * 3.5));
@@ -953,42 +1078,117 @@ export default function CustomerDashboard({
                 
                 {/* Responsive Location Box & Detect GPS Button */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                  <div className="flex-1 min-h-[44px] py-2 px-3 rounded-xl bg-[#F8FAFC] border border-[#D5DEE5] flex items-center justify-between gap-2 text-xs">
-                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                      <MapPin size={15} className="text-[#2F6B73] shrink-0" />
-                      <span className="font-semibold text-[#172033] truncate">{locationLabel}</span>
+                  <div className="flex-1 min-h-[46px] py-2 px-3.5 rounded-xl bg-[#F8FAFC] border border-[#D5DEE5] flex items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <MapPin size={16} className={detectingGps ? "text-[#2F6B73] animate-bounce shrink-0" : "text-[#2F6B73] shrink-0"} />
+                      <span className="font-semibold text-[#172033] truncate">
+                        {detectingGps ? (
+                          <span className="flex items-center gap-1.5 text-[#2F6B73]">
+                            <span className="inline-block w-2 h-2 rounded-full bg-[#2F6B73] animate-ping" />
+                            Detecting live GPS coordinates...
+                          </span>
+                        ) : (
+                          locationLabel
+                        )}
+                      </span>
                     </div>
-                    <span className="text-[10px] text-[#64748B] font-mono shrink-0 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                      {latitude.toFixed(4)}, {longitude.toFixed(4)}
-                    </span>
+                    {latitude !== null && longitude !== null ? (
+                      <span
+                        className="text-[10px] text-[#2F6B73] font-mono shrink-0 bg-teal-50 px-2 py-0.5 rounded-md border border-[#BFDBFE] font-bold"
+                        title={locationAccuracy ? `Accuracy: ±${Math.round(locationAccuracy)} meters` : undefined}
+                      >
+                        {latitude.toFixed(4)}, {longitude.toFixed(4)}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 font-mono shrink-0 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                        GPS Not Set
+                      </span>
+                    )}
                   </div>
                   <button
                     type="button"
-                    onClick={detectLocation}
+                    onClick={() => detectLocation(true)}
                     disabled={detectingGps}
-                    className="h-11 px-4 rounded-xl bg-[#2F6B73] hover:bg-[#24545A] disabled:opacity-50 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-xs"
+                    className="h-11 px-4 rounded-xl bg-[#2F6B73] hover:bg-[#24545A] disabled:opacity-50 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shrink-0 shadow-xs active:scale-98"
                     title="Detect current GPS location"
                   >
-                    <LocateFixed size={15} className={detectingGps ? "animate-spin" : ""} />
+                    <LocateFixed size={16} className={detectingGps ? "animate-spin text-white" : "text-white"} />
                     <span>{detectingGps ? "Detecting..." : "Detect Location"}</span>
                   </button>
                 </div>
 
-                {/* GPS Notice / Error Banner if Permission Denied */}
+                {/* GPS Notice / Error Banner if Permission Denied or Failed */}
                 {locationError && (
-                  <div className="mt-2.5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-center justify-between gap-2">
-                    <span className="leading-snug">{locationError}</span>
-                    <button
-                      type="button"
-                      onClick={detectLocation}
-                      className="px-2.5 py-1 rounded-lg bg-amber-200 hover:bg-amber-300 font-bold text-amber-950 text-[11px] shrink-0 cursor-pointer transition-colors"
-                    >
-                      Retry GPS
-                    </button>
+                  <div className="mt-3 p-3.5 sm:p-4 rounded-2xl bg-amber-50 border border-amber-200 text-[#172033] shadow-xs">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center shrink-0 mt-0.5">
+                          <AlertTriangle size={18} />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold text-amber-950 flex items-center gap-1.5 flex-wrap">
+                            <span>{locationError.title}</span>
+                            {locationError.type === "permission_denied" && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 font-bold uppercase tracking-wide">
+                                Permission Blocked
+                              </span>
+                            )}
+                          </h4>
+                          <p className="text-xs text-amber-900 mt-1 leading-relaxed">
+                            {locationError.message}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setLocationError(null)}
+                        className="text-amber-700 hover:text-amber-950 p-1 rounded-lg hover:bg-amber-100 transition-colors shrink-0"
+                        title="Dismiss notice"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+
+                    {/* Step-by-step instructions for Android Chrome / Mobile browser / Desktop */}
+                    {locationError.instructions && locationError.instructions.length > 0 && (
+                      <div className="mt-2.5 pt-2.5 border-t border-amber-200/80">
+                        <p className="text-[11px] font-bold text-amber-950 mb-1">
+                          How to enable location in your browser:
+                        </p>
+                        <ul className="space-y-1 text-[11px] text-amber-900/90 pl-3.5 list-disc">
+                          {locationError.instructions.map((inst, idx) => (
+                            <li key={idx} className="leading-snug">
+                              {inst}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Action buttons */}
+                    <div className="mt-3 pt-2.5 border-t border-amber-200/60 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => detectLocation(true)}
+                        disabled={detectingGps}
+                        className="h-9 px-3.5 rounded-xl bg-[#2F6B73] hover:bg-[#24545A] disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                      >
+                        <RefreshCw size={13} className={detectingGps ? "animate-spin" : ""} />
+                        <span>{detectingGps ? "Retrying GPS..." : "Retry GPS"}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowBreakdownMap(true)}
+                        className="h-9 px-3 rounded-xl bg-white hover:bg-amber-100/60 text-[#172033] border border-amber-300 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <MapPin size={13} className="text-[#2F6B73]" />
+                        <span>📍 Pick on Map</span>
+                      </button>
+                    </div>
                   </div>
                 )}
 
-                {/* Autocomplete Search Input & Action Buttons (Mobile-Responsive to Prevent Overflow) */}
+                {/* Autocomplete Search Input & Action Buttons */}
                 <form onSubmit={handleSearchLocation} className="mt-2.5 flex flex-col sm:flex-row gap-2">
                   <div className="relative flex-1">
                     <input
@@ -1024,15 +1224,22 @@ export default function CustomerDashboard({
                   <div className="mt-3 rounded-xl overflow-hidden border border-[#D5DEE5] shadow-inner relative">
                     <div className="h-60">
                       <MechanicMap
-                        location={{ latitude, longitude, label: locationLabel, source: "manual" }}
+                        location={{
+                          latitude: latitude ?? 13.0827,
+                          longitude: longitude ?? 80.2707,
+                          label: locationLabel,
+                          source: "manual",
+                        }}
                         pickerMode={true}
-                        pickedLocation={{ latitude, longitude }}
+                        pickedLocation={latitude !== null && longitude !== null ? { latitude, longitude } : null}
                         onPickLocation={handlePickBreakdownSpot}
                       />
                     </div>
                     <div className="bg-[#172033] text-white text-[11px] font-semibold px-3 py-1.5 flex items-center justify-between">
                       <span>📍 Click or drag pin to your exact vehicle breakdown spot</span>
-                      <span className="text-[#38BDF8] font-mono">{latitude.toFixed(4)}, {longitude.toFixed(4)}</span>
+                      <span className="text-[#38BDF8] font-mono">
+                        {latitude !== null && longitude !== null ? `${latitude.toFixed(4)}, ${longitude.toFixed(4)}` : "Pick on map"}
+                      </span>
                     </div>
                   </div>
                 )}
@@ -1174,7 +1381,13 @@ export default function CustomerDashboard({
                 </div>
                 <button
                   type="button"
-                  onClick={() => loadRegisteredMechanics(latitude, longitude)}
+                  onClick={() => {
+                    if (latitude !== null && longitude !== null) {
+                      loadRegisteredMechanics(latitude, longitude);
+                    } else {
+                      void detectLocation(true);
+                    }
+                  }}
                   className="p-2 rounded-xl border border-[#D5DEE5] bg-white hover:bg-slate-50 text-slate-600 transition-colors cursor-pointer"
                   title="Refresh nearby mechanics"
                 >
@@ -1190,7 +1403,11 @@ export default function CustomerDashboard({
                     type="button"
                     onClick={() => {
                       shopsCacheRef.current = {};
-                      loadRegisteredMechanics(latitude, longitude);
+                      if (latitude !== null && longitude !== null) {
+                        loadRegisteredMechanics(latitude, longitude);
+                      } else {
+                        void detectLocation(true);
+                      }
                     }}
                     className="px-3 py-1 rounded-lg bg-rose-200 hover:bg-rose-300 font-bold text-rose-950 text-[11px] shrink-0 cursor-pointer transition-colors"
                   >
@@ -1334,8 +1551,44 @@ export default function CustomerDashboard({
                 </div>
               )}
 
-              {/* No Mechanics within 7 km Informational State */}
-              {!loadingShops && mechanicsWithin7km.length === 0 && (
+              {/* Initial State: Waiting for user to detect GPS location */}
+              {!loadingShops && latitude === null && (
+                <div className="p-7 rounded-2xl bg-white border border-[#D5DEE5] text-center space-y-3.5 shadow-xs">
+                  <div className="w-12 h-12 rounded-xl bg-teal-50 text-[#2F6B73] flex items-center justify-center mx-auto border border-[#BFDBFE]">
+                    <LocateFixed size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-[#172033]">
+                      Detect Your Breakdown Location
+                    </h3>
+                    <p className="text-xs text-[#64748B] mt-1 max-w-sm mx-auto leading-relaxed">
+                      Tap &quot;Detect Location&quot; to allow browser GPS access, or search your breakdown area to discover nearby verified mechanics within 7 km.
+                    </p>
+                  </div>
+                  <div className="pt-1.5 flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => detectLocation(true)}
+                      disabled={detectingGps}
+                      className="px-4 py-2.5 rounded-xl bg-[#2F6B73] hover:bg-[#24545A] disabled:opacity-50 text-white text-xs font-bold cursor-pointer shadow-xs transition-colors flex items-center gap-1.5"
+                    >
+                      <LocateFixed size={14} className={detectingGps ? "animate-spin" : ""} />
+                      <span>{detectingGps ? "Detecting GPS..." : "Detect Current Location"}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowBreakdownMap(true)}
+                      className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 border border-[#D5DEE5] text-xs font-bold text-[#172033] cursor-pointer shadow-xs transition-colors flex items-center gap-1.5"
+                    >
+                      <MapPin size={14} className="text-[#2F6B73]" />
+                      <span>📍 Pick on Map</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* No Mechanics within 7 km of user's real location */}
+              {!loadingShops && latitude !== null && mechanicsWithin7km.length === 0 && (
                 <div className="p-6 rounded-2xl bg-[#EAF4FF] border border-[#BFDBFE] text-center space-y-3">
                   <div className="w-12 h-12 rounded-xl bg-white text-[#2F6B73] flex items-center justify-center mx-auto border border-[#BFDBFE]">
                     <Store size={22} />
@@ -1345,40 +1598,42 @@ export default function CustomerDashboard({
                       No partner workshops within 7 km
                     </h3>
                     <p className="text-xs text-[#64748B] mt-1 max-w-sm mx-auto leading-relaxed">
-                      We strictly show genuine, verified mechanics. Currently, no registered workshop is within 7 km of <span className="font-semibold text-slate-800">{locationLabel}</span> ({latitude.toFixed(4)}, {longitude.toFixed(4)}).
+                      We strictly show genuine, verified mechanics. Currently, no registered workshop is within 7 km of{" "}
+                      <span className="font-semibold text-slate-800">{locationLabel}</span>{" "}
+                      {longitude !== null && (
+                        <span className="font-mono text-slate-600 block text-[11px] mt-0.5">
+                          ({latitude.toFixed(4)}, {longitude.toFixed(4)})
+                        </span>
+                      )}.
                     </p>
                   </div>
                   <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
                     <button
                       type="button"
-                      onClick={() => {
-                        const annaLat = 13.0827;
-                        const annaLng = 80.2707;
-                        setLatitude(annaLat);
-                        setLongitude(annaLng);
-                        setLocationLabel("Anna Salai, Chennai");
-                        loadRegisteredMechanics(annaLat, annaLng);
-                        say("Switched to Anna Salai (Ajmal Workshop area)");
-                      }}
-                      className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 border border-[#BFDBFE] text-xs font-bold text-[#2F6B73] cursor-pointer shadow-xs transition-colors"
+                      onClick={() => detectLocation(true)}
+                      disabled={detectingGps}
+                      className="px-3.5 py-2 rounded-xl bg-[#2F6B73] hover:bg-[#24545A] disabled:opacity-50 text-white text-xs font-bold cursor-pointer shadow-xs transition-colors flex items-center gap-1.5"
                     >
-                      View Anna Salai, Chennai (Ajmal Workshop)
+                      <RefreshCw size={13} className={detectingGps ? "animate-spin" : ""} />
+                      <span>{detectingGps ? "Retrying GPS..." : "Retry GPS"}</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        const chromeLat = 12.9516;
-                        const chromeLng = 80.1462;
-                        setLatitude(chromeLat);
-                        setLongitude(chromeLng);
-                        setLocationLabel("Chromepet, Chennai");
-                        loadRegisteredMechanics(chromeLat, chromeLng);
-                        say("Switched to Chromepet (Speed Wings Auto Care area)");
-                      }}
-                      className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 border border-[#BFDBFE] text-xs font-bold text-[#2F6B73] cursor-pointer shadow-xs transition-colors"
+                      onClick={() => setShowBreakdownMap(true)}
+                      className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 border border-[#BFDBFE] text-xs font-bold text-[#2F6B73] cursor-pointer shadow-xs transition-colors flex items-center gap-1.5"
                     >
-                      View Chromepet, Chennai (Speed Wings)
+                      <MapPin size={13} />
+                      <span>📍 Pick on Map</span>
                     </button>
+                    <a
+                      href="https://wa.me/919876543210?text=Hello%20SevaiGo,%20I%20need%20emergency%20roadside%20breakdown%20assistance"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3.5 py-2 rounded-xl bg-[#10B981] hover:bg-emerald-600 text-white text-xs font-bold cursor-pointer shadow-xs transition-colors flex items-center gap-1.5"
+                    >
+                      <Phone size={13} />
+                      <span>Emergency Helpline</span>
+                    </a>
                   </div>
                 </div>
               )}

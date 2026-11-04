@@ -11,6 +11,7 @@ import MechanicMap, { type MapLocation } from "@/components/MechanicMap";
 import type { PublicUser } from "@/lib/auth";
 import { DEMO_LOCATION } from "@/lib/mechanic-shared";
 import { supabase } from "@/lib/supabaseClient";
+import { getCurrentGpsPosition } from "@/lib/geolocation";
 
 export type OwnerShopData = {
   id: string;
@@ -263,31 +264,23 @@ export default function RegisterShopFlow({
   }, [fetchOwnerShop]);
 
   // Handle GPS location detection
-  function handleUseCurrentLocation() {
-    if (!navigator.geolocation) {
-      setErrorMessage("Geolocation is not supported by your browser.");
-      return;
-    }
+  async function handleUseCurrentLocation() {
     setGeoLocating(true);
     setErrorMessage("");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setPickedCoords({
-          latitude: Number(pos.coords.latitude.toFixed(6)),
-          longitude: Number(pos.coords.longitude.toFixed(6)),
-        });
-        setGeoLocating(false);
-      },
-      (err) => {
-        setGeoLocating(false);
-        setErrorMessage(
-          err.code === 1
-            ? "Location permission denied. Please click on the map directly to place your shop marker."
-            : "Could not detect your current location. Please pick your location on the map."
-        );
-      },
-      { timeout: 10000, enableHighAccuracy: true }
-    );
+    try {
+      const pos = await getCurrentGpsPosition();
+      setPickedCoords({
+        latitude: Number(pos.latitude.toFixed(6)),
+        longitude: Number(pos.longitude.toFixed(6)),
+      });
+    } catch (err: any) {
+      setErrorMessage(
+        err?.message ||
+          "Could not detect your current location. Please pick your location directly on the map."
+      );
+    } finally {
+      setGeoLocating(false);
+    }
   }
 
   // Play audio alert chime when new customer breakdown request arrives
