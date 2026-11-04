@@ -9,9 +9,10 @@ export function cleanText(value: unknown, maxLength = 200) {
 export function validImageUrl(value: unknown) {
   if (typeof value !== "string" || !value.trim()) return null;
   const url = value.trim();
-  if (url.startsWith("/images/")) return url;
+  if (url.startsWith("/images/") || url.startsWith("data:image/")) return url;
   try {
-    return new URL(url).protocol === "https:" ? url : null;
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" || parsed.protocol === "http:" ? url : null;
   } catch {
     return null;
   }

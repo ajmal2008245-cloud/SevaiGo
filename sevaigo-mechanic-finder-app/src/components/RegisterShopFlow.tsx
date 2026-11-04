@@ -171,10 +171,14 @@ export default function RegisterShopFlow({
             const shopLat = Number.isFinite(rawShopLat) ? rawShopLat : 13.0827;
             const shopLng = Number.isFinite(rawShopLng) ? rawShopLng : 80.2707;
 
+            const rawApproval = (matched.approval_status || matched.approvalStatus || (matched.verified ? "approved" : "pending")).toLowerCase();
+            const normalizedApproval = rawApproval === "approved" ? "approved" : rawApproval === "rejected" ? "rejected" : "pending";
+            const isVerifiedVal = Boolean(matched.verified ?? matched.isVerified ?? (normalizedApproval === "approved"));
+
             setExistingShop({
               id: matched.id,
-              shopName: matched.shop_name || "Workshop",
-              ownerName: matched.owner_name || "Mechanic",
+              shopName: matched.shop_name || matched.shopName || "Workshop",
+              ownerName: matched.owner_name || matched.ownerName || "Mechanic",
               phone: matched.phone || "",
               shopPhone: matched.phone || "",
               address: matched.address || "",
@@ -182,17 +186,17 @@ export default function RegisterShopFlow({
               pincode: shopPincode,
               latitude: shopLat,
               longitude: shopLng,
-              vehicleTypes: ["2w", "4w"],
+              vehicleTypes: matched.vehicle_types || matched.vehicleTypes || ["2w", "4w"],
               specializations: servicesList,
-              openTime: "08:00",
-              closeTime: "21:00",
-              photos: ["/images/workshop-1.jpg"],
-              approvalStatus: "approved",
-              availabilityStatus: "available",
-              priceMin: 300,
-              priceMax: 2500,
-              yearsExperience: 5,
-              isVerified: matched.verified ?? true,
+              openTime: matched.open_time || matched.openTime || "08:00",
+              closeTime: matched.close_time || matched.closeTime || "21:00",
+              photos: matched.photos || ["/images/workshop-1.jpg"],
+              approvalStatus: normalizedApproval,
+              availabilityStatus: matched.availability_status || matched.availabilityStatus || "available",
+              priceMin: matched.price_min || matched.priceMin || 300,
+              priceMax: matched.price_max || matched.priceMax || 2500,
+              yearsExperience: matched.years_experience || matched.yearsExperience || 5,
+              isVerified: isVerifiedVal,
             });
             setEditDraft({
               shopName: matched.shop_name || "",
@@ -550,6 +554,7 @@ export default function RegisterShopFlow({
 
   async function handleRegisterSubmit(e: FormEvent) {
     e.preventDefault();
+    if (submitting) return;
     setErrorMessage("");
     setSuccessMessage("");
 
@@ -560,8 +565,8 @@ export default function RegisterShopFlow({
       return;
     }
 
-    if (!user && (!password || password.length < 6)) {
-      setErrorMessage("Please set a password with at least 6 characters so you can sign in to your dashboard.");
+    if (ownerName.trim().length < 2) {
+      setErrorMessage("Please enter the workshop owner's name (at least 2 characters).");
       return;
     }
 
@@ -570,8 +575,18 @@ export default function RegisterShopFlow({
       return;
     }
 
-    if (address.trim().length < 8) {
+    if (address.trim().length < 5) {
       setErrorMessage("Please enter the complete shop address (street, area, landmarks).");
+      return;
+    }
+
+    if (!user && (!password || password.length < 6)) {
+      setErrorMessage("Please set a password with at least 6 characters so you can sign in to your dashboard.");
+      return;
+    }
+
+    if (!Number.isFinite(pickedCoords.latitude) || !Number.isFinite(pickedCoords.longitude)) {
+      setErrorMessage("Please select or detect your workshop GPS location on the map.");
       return;
     }
 
@@ -672,6 +687,10 @@ export default function RegisterShopFlow({
         ? s.specializations
         : servicesList;
 
+      const rawApproval = (s.approval_status || s.approvalStatus || "pending").toLowerCase();
+      const normalizedApproval = rawApproval === "approved" ? "approved" : rawApproval === "rejected" ? "rejected" : "pending";
+      const isVerifiedVal = Boolean(s.verified ?? s.is_verified ?? s.isVerified ?? (normalizedApproval === "approved"));
+
       setExistingShop({
         id: s.id || `shop-${Date.now()}`,
         shopName: s.shop_name || s.shopName || shopName.trim(),
@@ -686,16 +705,16 @@ export default function RegisterShopFlow({
         specializations: returnedServices,
         openTime,
         closeTime,
-        photos: workshopPhotoUrl.trim() ? [workshopPhotoUrl.trim()] : ["/images/workshop-1.jpg"],
-        approvalStatus: "approved",
+        photos: (shopPhotoPreview.trim() || workshopPhotoUrl.trim()) ? [shopPhotoPreview.trim() || workshopPhotoUrl.trim()] : ["/images/workshop-1.jpg"],
+        approvalStatus: normalizedApproval,
         availabilityStatus: "available",
         priceMin: Number(priceMin) || 300,
         priceMax: Number(priceMax) || 2500,
         yearsExperience: Number(yearsExperience) || 5,
-        isVerified: true,
+        isVerified: isVerifiedVal,
       });
 
-      setSuccessMessage("Workshop registered successfully! Your garage has been saved to the database.");
+      setSuccessMessage("Workshop registered successfully! Your application has been saved to the database and is now PENDING VERIFICATION by the SevaiGo safety team.");
 
       // Refresh current user and owner shop
       try {
@@ -1131,10 +1150,9 @@ export default function RegisterShopFlow({
 
       {/* Top Header */}
       <header
+        className="glass-nav"
         style={{
           height: "70px",
-          borderBottom: "1px solid var(--border)",
-          backgroundColor: "var(--surface)",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -1155,12 +1173,15 @@ export default function RegisterShopFlow({
                 gap: "6px",
                 fontSize: "0.86rem",
                 fontWeight: "700",
-                color: "#ff8c32",
+                color: "#6B4A2E",
                 padding: "8px 14px",
-                borderRadius: "8px",
-                backgroundColor: "rgba(255, 140, 50, 0.1)",
-                border: "1px solid rgba(255, 140, 50, 0.25)",
+                borderRadius: "12px",
+                backgroundColor: "rgba(255, 255, 255, 0.65)",
+                border: "1px solid rgba(107, 74, 46, 0.22)",
+                backdropFilter: "blur(12px)",
+                WebkitBackdropFilter: "blur(12px)",
                 cursor: "pointer",
+                boxShadow: "0 2px 8px rgba(73, 48, 31, 0.06)",
               }}
             >
               <ArrowLeft size={16} /> <span>Back to Home</span>
@@ -1174,11 +1195,14 @@ export default function RegisterShopFlow({
                 gap: "6px",
                 fontSize: "0.86rem",
                 fontWeight: "700",
-                color: "#ff8c32",
+                color: "#6B4A2E",
                 padding: "8px 14px",
-                borderRadius: "8px",
-                backgroundColor: "rgba(255, 140, 50, 0.1)",
-                border: "1px solid rgba(255, 140, 50, 0.25)",
+                borderRadius: "12px",
+                backgroundColor: "rgba(255, 255, 255, 0.65)",
+                border: "1px solid rgba(107, 74, 46, 0.22)",
+                backdropFilter: "blur(12px)",
+                WebkitBackdropFilter: "blur(12px)",
+                boxShadow: "0 2px 8px rgba(73, 48, 31, 0.06)",
               }}
             >
               <ArrowLeft size={16} /> <span>Back to Home</span>
@@ -1187,19 +1211,21 @@ export default function RegisterShopFlow({
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <span
               style={{
-                width: "32px",
-                height: "32px",
-                borderRadius: "8px",
-                background: "linear-gradient(145deg, #f27866, #db4642)",
+                width: "34px",
+                height: "34px",
+                borderRadius: "10px",
+                background: "linear-gradient(135deg, #6B4A2E 0%, #49301F 100%)",
                 color: "#fff",
                 display: "grid",
                 placeItems: "center",
+                boxShadow: "0 4px 12px rgba(73, 48, 31, 0.25)",
+                border: "1px solid rgba(255, 255, 255, 0.3)",
               }}
             >
               <Wrench size={18} strokeWidth={2.4} />
             </span>
-            <span style={{ fontFamily: "Manrope, sans-serif", fontSize: "1.2rem", fontWeight: "800", letterSpacing: "-0.04em" }}>
-              Sevai<span style={{ color: "var(--red)" }}>Go</span> <small style={{ fontSize: "0.68rem", color: "var(--muted)" }}>PARTNER</small>
+            <span style={{ fontFamily: "Manrope, sans-serif", fontSize: "1.2rem", fontWeight: "800", letterSpacing: "-0.04em", color: "#29231E" }}>
+              Sevai<span style={{ color: "#6B4A2E" }}>Go</span> <small style={{ fontSize: "0.68rem", color: "#766B60", fontWeight: "700" }}>PARTNER</small>
             </span>
           </div>
         </div>
@@ -1211,9 +1237,10 @@ export default function RegisterShopFlow({
                 style={{
                   width: "32px",
                   height: "32px",
-                  borderRadius: "8px",
-                  backgroundColor: "#dbe7dc",
-                  color: "#426951",
+                  borderRadius: "10px",
+                  backgroundColor: "rgba(107, 74, 46, 0.15)",
+                  color: "#49301F",
+                  border: "1px solid rgba(107, 74, 46, 0.25)",
                   display: "grid",
                   placeItems: "center",
                   fontWeight: "800",
@@ -1222,10 +1249,10 @@ export default function RegisterShopFlow({
               >
                 {user.name.slice(0, 1).toUpperCase()}
               </span>
-              <span style={{ fontSize: "0.82rem", fontWeight: "700" }}>{user.name}</span>
+              <span style={{ fontSize: "0.82rem", fontWeight: "700", color: "#29231E" }}>{user.name}</span>
             </div>
           ) : (
-            <span style={{ fontSize: "0.8rem", color: "var(--muted-dark)" }}>Mechanic Portal</span>
+            <span style={{ fontSize: "0.8rem", color: "#766B60" }}>Mechanic Portal</span>
           )}
         </div>
       </header>
@@ -1234,16 +1261,13 @@ export default function RegisterShopFlow({
       <main style={{ maxWidth: "1080px", margin: "0 auto", padding: "32px 20px 80px" }}>
         {/* Banner Section */}
         <section
+          className="glass-card"
           style={{
-            background: "#FFFFFF",
-            color: "#0F172A",
-            border: "1px solid #E2E8F0",
-            borderRadius: "20px",
+            color: "#29231E",
             padding: "36px 32px",
             marginBottom: "32px",
             position: "relative",
             overflow: "hidden",
-            boxShadow: "0 4px 20px rgba(0, 0, 0, 0.05)",
           }}
         >
           <div style={{ maxWidth: "660px", position: "relative", zIndex: 2 }}>
@@ -1252,8 +1276,9 @@ export default function RegisterShopFlow({
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "6px",
-                background: "rgba(255, 121, 0, 0.1)",
-                color: "#FF7900",
+                background: "rgba(107, 74, 46, 0.12)",
+                color: "#6B4A2E",
+                border: "1px solid rgba(107, 74, 46, 0.22)",
                 padding: "5px 12px",
                 borderRadius: "20px",
                 fontSize: "0.76rem",
@@ -1265,11 +1290,11 @@ export default function RegisterShopFlow({
             >
               <Sparkles size={14} /> SEVAIGO Mechanic Partner Portal
             </span>
-            <h1 style={{ fontSize: "2.1rem", fontWeight: "800", letterSpacing: "-0.04em", margin: "0 0 12px", lineHeight: 1.25, color: "#0F172A" }}>
+            <h1 style={{ fontSize: "2.1rem", fontWeight: "800", letterSpacing: "-0.04em", margin: "0 0 12px", lineHeight: 1.25, color: "#29231E" }}>
               Register Your Workshop. <br />
-              <span style={{ color: "#FF7900" }}>Connect with Stranded Motorists.</span>
+              <span style={{ color: "#6B4A2E" }}>Connect with Stranded Motorists.</span>
             </h1>
-            <p style={{ fontSize: "0.95rem", color: "#64748B", lineHeight: 1.55, margin: 0 }}>
+            <p style={{ fontSize: "0.95rem", color: "#766B60", lineHeight: 1.55, margin: 0 }}>
               Join Tamil Nadu’s leading real-time roadside assistance network. Register your garage, define your services, pin your precise workshop location, and receive immediate assistance calls when drivers and riders break down nearby.
             </p>
           </div>
@@ -1281,7 +1306,7 @@ export default function RegisterShopFlow({
               bottom: "-10px",
               opacity: 0.05,
               pointerEvents: "none",
-              color: "#0F172A",
+              color: "#49301F",
             }}
           >
             <Store size={220} strokeWidth={1} />
@@ -1349,7 +1374,7 @@ export default function RegisterShopFlow({
             {/* Verification Status Banner */}
             <div
               style={{
-                borderRadius: "16px",
+                borderRadius: "18px",
                 padding: "20px 24px",
                 marginBottom: "24px",
                 display: "flex",
@@ -1357,67 +1382,100 @@ export default function RegisterShopFlow({
                 alignItems: "center",
                 justifyContent: "space-between",
                 gap: "16px",
+                backdropFilter: "blur(18px)",
+                WebkitBackdropFilter: "blur(18px)",
+                boxShadow: "0 8px 32px rgba(73, 48, 31, 0.08)",
                 backgroundColor:
                   existingShop.approvalStatus === "approved"
-                    ? "var(--green-soft)"
+                    ? "rgba(39, 132, 91, 0.12)"
                     : existingShop.approvalStatus === "rejected"
-                    ? "var(--red-soft)"
-                    : "#fff8ed",
+                    ? "rgba(214, 69, 69, 0.12)"
+                    : "rgba(197, 138, 53, 0.14)",
                 border:
                   existingShop.approvalStatus === "approved"
-                    ? "1px solid #a3e2c3"
+                    ? "1px solid rgba(39, 132, 91, 0.35)"
                     : existingShop.approvalStatus === "rejected"
-                    ? "1px solid #f2b0ad"
-                    : "1px solid #fedfa7",
+                    ? "1px solid rgba(214, 69, 69, 0.35)"
+                    : "1px solid rgba(197, 138, 53, 0.35)",
               }}
             >
               <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
                 <span
                   style={{
-                    width: "40px",
-                    height: "40px",
-                    borderRadius: "10px",
+                    width: "44px",
+                    height: "44px",
+                    borderRadius: "12px",
                     display: "grid",
                     placeItems: "center",
                     backgroundColor:
                       existingShop.approvalStatus === "approved"
-                        ? "var(--green)"
+                        ? "#27845B"
                         : existingShop.approvalStatus === "rejected"
-                        ? "var(--red)"
-                        : "#d98d28",
+                        ? "#D64545"
+                        : "#C58A35",
                     color: "#ffffff",
                     flexShrink: 0,
+                    boxShadow: "0 4px 12px rgba(73, 48, 31, 0.15)",
                   }}
                 >
                   {existingShop.approvalStatus === "approved" ? (
-                    <CheckCircle2 size={22} />
+                    <CheckCircle2 size={24} />
                   ) : existingShop.approvalStatus === "rejected" ? (
-                    <ShieldAlert size={22} />
+                    <ShieldAlert size={24} />
                   ) : (
-                    <Clock3 size={22} />
+                    <Clock3 size={24} />
                   )}
                 </span>
                 <div>
-                  <h3
-                    style={{
-                      margin: "0 0 4px",
-                      fontSize: "1.05rem",
-                      fontWeight: "800",
-                      color:
-                        existingShop.approvalStatus === "approved"
-                          ? "#0c6746"
-                          : existingShop.approvalStatus === "rejected"
-                          ? "#ab2e2a"
-                          : "#9e6113",
-                    }}
-                  >
-                    Verification Status:{" "}
-                    {existingShop.approvalStatus === "approved"
-                      ? "Approved & Live on Map"
-                      : existingShop.approvalStatus === "rejected"
-                      ? "Application Rejected"
-                      : "Pending Review"}
-                  </h3>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                    <h3
+                      style={{
+                        margin: 0,
+                        fontSize: "1.08rem",
+                        fontWeight: "800",
+                        color:
+                          existingShop.approvalStatus === "approved"
+                            ? "#1B6543"
+                            : existingShop.approvalStatus === "rejected"
+                            ? "#A32828"
+                            : "#8A5A1A",
+                      }}
+                    >
+                      Status:{" "}
+                      {existingShop.approvalStatus === "approved"
+                        ? "APPROVED"
+                        : existingShop.approvalStatus === "rejected"
+                        ? "REJECTED"
+                        : "PENDING_VERIFICATION"}
+                    </h3>
+                    <span
+                      style={{
+                        padding: "3px 8px",
+                        borderRadius: "12px",
+                        fontSize: "0.72rem",
+                        fontWeight: "800",
+                        backgroundColor:
+                          existingShop.approvalStatus === "approved"
+                            ? "rgba(39, 132, 91, 0.2)"
+                            : existingShop.approvalStatus === "rejected"
+                            ? "rgba(214, 69, 69, 0.2)"
+                            : "rgba(197, 138, 53, 0.2)",
+                        color:
+                          existingShop.approvalStatus === "approved"
+                            ? "#1B6543"
+                            : existingShop.approvalStatus === "rejected"
+                            ? "#A32828"
+                            : "#8A5A1A",
+                        border: "1px solid rgba(255, 255, 255, 0.5)",
+                      }}
+                    >
+                      {existingShop.approvalStatus === "approved"
+                        ? "Live on Map"
+                        : existingShop.approvalStatus === "rejected"
+                        ? "Action Needed"
+                        : "Under Safety Review"}
+                    </span>
+                  </div>
                   <p
                     style={{
                       margin: 0,
@@ -1427,7 +1485,7 @@ export default function RegisterShopFlow({
                           ? "#156345"
                           : existingShop.approvalStatus === "rejected"
                           ? "#912d2a"
-                          : "#8c5615",
+                          : "#766B60",
                       lineHeight: 1.45,
                     }}
                   >
@@ -2182,12 +2240,10 @@ export default function RegisterShopFlow({
           /* State 2: New Registration Form */
           <form
             onSubmit={handleRegisterSubmit}
+            noValidate
+            className="glass-card"
             style={{
-              backgroundColor: "var(--surface)",
-              border: "1px solid var(--border)",
-              borderRadius: "20px",
               padding: "36px 32px",
-              boxShadow: "var(--shadow)",
             }}
           >
             {/* Step 0: First Shop Front Photo */}
@@ -2196,8 +2252,10 @@ export default function RegisterShopFlow({
                 marginBottom: "32px",
                 padding: "24px",
                 borderRadius: "16px",
-                backgroundColor: "#fff8f3",
-                border: "2px dashed #f97316",
+                backgroundColor: "rgba(248, 244, 238, 0.72)",
+                border: "2px dashed rgba(107, 74, 46, 0.35)",
+                backdropFilter: "blur(12px)",
+                WebkitBackdropFilter: "blur(12px)",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
@@ -2206,7 +2264,7 @@ export default function RegisterShopFlow({
                     width: "32px",
                     height: "32px",
                     borderRadius: "50%",
-                    backgroundColor: "#FF7900",
+                    backgroundColor: "#6B4A2E",
                     color: "#ffffff",
                     display: "grid",
                     placeItems: "center",
@@ -2217,10 +2275,10 @@ export default function RegisterShopFlow({
                   📸
                 </span>
                 <div>
-                  <h2 style={{ fontSize: "1.18rem", fontWeight: "800", margin: 0, color: "#0f172a" }}>
+                  <h2 style={{ fontSize: "1.18rem", fontWeight: "800", margin: 0, color: "#29231E" }}>
                     First Shop Photo (Garage Front View) *
                   </h2>
-                  <p style={{ margin: 0, fontSize: "0.8rem", color: "#64748b" }}>
+                  <p style={{ margin: 0, fontSize: "0.8rem", color: "#766B60" }}>
                     Attach an original photo of your workshop entrance so breakdown customers can easily recognize your garage.
                   </p>
                 </div>
@@ -2228,7 +2286,7 @@ export default function RegisterShopFlow({
 
               <div style={{ display: "flex", flexWrap: "wrap", gap: "18px", alignItems: "center" }}>
                 {shopPhotoPreview || workshopPhotoUrl ? (
-                  <div style={{ position: "relative", width: "170px", height: "115px", borderRadius: "12px", overflow: "hidden", border: "2px solid #FF7900", boxShadow: "0 4px 12px rgba(255,121,0,0.15)" }}>
+                  <div style={{ position: "relative", width: "170px", height: "115px", borderRadius: "12px", overflow: "hidden", border: "2px solid #6B4A2E", boxShadow: "0 4px 16px rgba(73, 48, 31, 0.2)" }}>
                     <img
                       src={shopPhotoPreview || workshopPhotoUrl}
                       alt="Shop Front"
@@ -2264,21 +2322,21 @@ export default function RegisterShopFlow({
                       width: "170px",
                       height: "115px",
                       borderRadius: "12px",
-                      border: "2px dashed #FF7900",
-                      backgroundColor: "rgba(255, 121, 0, 0.08)",
+                      border: "2px dashed #6B4A2E",
+                      backgroundColor: "rgba(107, 74, 46, 0.08)",
                       display: "flex",
                       flexDirection: "column",
                       alignItems: "center",
                       justifyContent: "center",
                       gap: "6px",
                       cursor: "pointer",
-                      color: "#c2410c",
+                      color: "#6B4A2E",
                       fontSize: "0.8rem",
                       fontWeight: "800",
                       transition: "background-color 0.2s",
                     }}
                   >
-                    <Camera size={26} className="text-[#FF7900]" />
+                    <Camera size={26} style={{ color: "#6B4A2E" }} />
                     <span>Upload Shop Photo</span>
                     <input
                       type="file"
@@ -2290,22 +2348,21 @@ export default function RegisterShopFlow({
                 )}
 
                 <div style={{ flex: 1, minWidth: "240px" }}>
-                  <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.82rem", fontWeight: "700" }}>
-                    <span>Or Workshop Image URL:</span>
+                  <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.82rem", fontWeight: "700", color: "#29231E" }}>
+                    <span>Or Workshop Image URL (or paste image data):</span>
                     <input
-                      type="url"
-                      placeholder="https://images.example.com/shop-photo.jpg"
+                      type="text"
+                      placeholder="https://images.example.com/shop-photo.jpg or data:image/..."
                       value={workshopPhotoUrl}
                       onChange={(e) => {
                         setWorkshopPhotoUrl(e.target.value);
                         if (!shopPhotoPreview) setShopPhotoPreview(e.target.value);
                       }}
+                      className="glass-input"
                       style={{
                         height: "44px",
                         borderRadius: "10px",
-                        border: "1px solid var(--border)",
                         padding: "0 14px",
-                        backgroundColor: "var(--bg)",
                         fontSize: "0.85rem",
                       }}
                     />
@@ -2479,15 +2536,15 @@ export default function RegisterShopFlow({
             </div>
 
             {/* Step 2: Vehicle Types Supported */}
-            <div style={{ marginBottom: "36px", paddingTop: "28px", borderTop: "1px solid var(--border)" }}>
+            <div style={{ marginBottom: "36px", paddingTop: "28px", borderTop: "1px solid rgba(107, 74, 46, 0.18)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "18px" }}>
                 <span
                   style={{
                     width: "28px",
                     height: "28px",
                     borderRadius: "50%",
-                    backgroundColor: "var(--red-soft)",
-                    color: "var(--red)",
+                    backgroundColor: "rgba(107, 74, 46, 0.14)",
+                    color: "#6B4A2E",
                     display: "grid",
                     placeItems: "center",
                     fontWeight: "800",
@@ -2496,7 +2553,7 @@ export default function RegisterShopFlow({
                 >
                   2
                 </span>
-                <h2 style={{ fontSize: "1.25rem", fontWeight: "800", margin: 0 }}>Vehicle Types Serviced *</h2>
+                <h2 style={{ fontSize: "1.25rem", fontWeight: "800", margin: 0, color: "#29231E" }}>Vehicle Types Serviced *</h2>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px" }}>
@@ -2514,13 +2571,14 @@ export default function RegisterShopFlow({
                         padding: "10px 14px",
                         borderRadius: "10px",
                         border: "1.5px solid",
-                        borderColor: active ? "var(--red)" : "var(--border)",
-                        backgroundColor: active ? "var(--red-soft)" : "var(--bg)",
-                        color: active ? "var(--red)" : "var(--muted-dark)",
+                        borderColor: active ? "#6B4A2E" : "rgba(107, 74, 46, 0.2)",
+                        backgroundColor: active ? "rgba(107, 74, 46, 0.14)" : "rgba(255, 255, 255, 0.6)",
+                        color: active ? "#49301F" : "#766B60",
                         fontWeight: "700",
                         fontSize: "0.82rem",
                         cursor: "pointer",
                         textAlign: "left",
+                        transition: "all 0.2s ease",
                       }}
                     >
                       <Icon size={18} />
@@ -2533,7 +2591,7 @@ export default function RegisterShopFlow({
             </div>
 
             {/* Step 3: Exact Location Picker with Location Type Option */}
-            <div style={{ marginBottom: "36px", paddingTop: "28px", borderTop: "1px solid var(--border)" }}>
+            <div style={{ marginBottom: "36px", paddingTop: "28px", borderTop: "1px solid rgba(107, 74, 46, 0.18)" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginBottom: "18px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <span
@@ -2541,8 +2599,8 @@ export default function RegisterShopFlow({
                       width: "28px",
                       height: "28px",
                       borderRadius: "50%",
-                      backgroundColor: "var(--red-soft)",
-                      color: "var(--red)",
+                      backgroundColor: "rgba(107, 74, 46, 0.14)",
+                      color: "#6B4A2E",
                       display: "grid",
                       placeItems: "center",
                       fontWeight: "800",
@@ -2552,8 +2610,8 @@ export default function RegisterShopFlow({
                     3
                   </span>
                   <div>
-                    <h2 style={{ fontSize: "1.25rem", fontWeight: "800", margin: 0 }}>Exact Workshop Location</h2>
-                    <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--muted-dark)" }}>
+                    <h2 style={{ fontSize: "1.25rem", fontWeight: "800", margin: 0, color: "#29231E" }}>Exact Workshop Location</h2>
+                    <p style={{ margin: 0, fontSize: "0.8rem", color: "#766B60" }}>
                       Type your area or pin on the live map so nearby breakdown motorists can find you within 7 km.
                     </p>
                   </div>
@@ -2568,10 +2626,10 @@ export default function RegisterShopFlow({
                     alignItems: "center",
                     gap: "6px",
                     padding: "8px 14px",
-                    borderRadius: "8px",
-                    border: "1px solid #159367",
-                    backgroundColor: "var(--green-soft)",
-                    color: "var(--green)",
+                    borderRadius: "10px",
+                    border: "1px solid rgba(39, 132, 91, 0.35)",
+                    backgroundColor: "rgba(39, 132, 91, 0.14)",
+                    color: "#1B6543",
                     fontWeight: "700",
                     fontSize: "0.82rem",
                     cursor: "pointer",
@@ -2586,13 +2644,15 @@ export default function RegisterShopFlow({
               <div
                 style={{
                   marginBottom: "18px",
-                  backgroundColor: "#fff8f0",
-                  border: "1.5px solid #fedfa7",
+                  backgroundColor: "rgba(248, 244, 238, 0.75)",
+                  border: "1.5px solid rgba(107, 74, 46, 0.22)",
                   borderRadius: "14px",
                   padding: "16px 18px",
+                  backdropFilter: "blur(12px)",
+                  WebkitBackdropFilter: "blur(12px)",
                 }}
               >
-                <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.85rem", fontWeight: "800", color: "#92400e" }}>
+                <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.85rem", fontWeight: "800", color: "#49301F" }}>
                   <span>📍 Location Type Option (Type Area name to automatically place pin on map):</span>
                   <div style={{ display: "flex", gap: "8px" }}>
                     <input
@@ -2606,29 +2666,25 @@ export default function RegisterShopFlow({
                           void handleSearchLocation();
                         }
                       }}
+                      className="glass-input"
                       style={{
                         flex: 1,
                         height: "44px",
                         borderRadius: "10px",
-                        border: "1.5px solid #f97316",
                         padding: "0 14px",
-                        backgroundColor: "#ffffff",
                         fontSize: "0.88rem",
                         fontWeight: "600",
-                        color: "#0f172a",
                       }}
                     />
                     <button
                       type="button"
                       onClick={() => handleSearchLocation()}
                       disabled={isSearchingLocation || !locationQuery.trim()}
+                      className="glass-btn-primary"
                       style={{
                         padding: "0 18px",
                         height: "44px",
                         borderRadius: "10px",
-                        backgroundColor: "#f97316",
-                        color: "#ffffff",
-                        border: 0,
                         fontSize: "0.85rem",
                         fontWeight: "800",
                         cursor: isSearchingLocation ? "not-allowed" : "pointer",
@@ -2643,7 +2699,7 @@ export default function RegisterShopFlow({
                   </div>
                 </label>
                 <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "10px" }}>
-                  <span style={{ fontSize: "0.74rem", color: "#78350f", fontWeight: "700" }}>Quick Areas:</span>
+                  <span style={{ fontSize: "0.74rem", color: "#6B4A2E", fontWeight: "700" }}>Quick Areas:</span>
                   {["Chromepet", "Tambaram", "Guindy", "Anna Nagar", "Velachery", "Coimbatore", "Madurai", "Salem"].map((preset) => (
                     <button
                       key={preset}
@@ -2654,13 +2710,15 @@ export default function RegisterShopFlow({
                       }}
                       style={{
                         fontSize: "0.72rem",
-                        padding: "3px 9px",
-                        borderRadius: "6px",
-                        backgroundColor: "#ffffff",
-                        border: "1px solid #fedfa7",
-                        color: "#c2410c",
+                        padding: "4px 10px",
+                        borderRadius: "8px",
+                        backgroundColor: "rgba(255, 255, 255, 0.75)",
+                        border: "1px solid rgba(107, 74, 46, 0.22)",
+                        color: "#6B4A2E",
                         cursor: "pointer",
                         fontWeight: "700",
+                        backdropFilter: "blur(8px)",
+                        WebkitBackdropFilter: "blur(8px)",
                       }}
                     >
                       {preset}
@@ -2671,7 +2729,7 @@ export default function RegisterShopFlow({
 
               {/* Address inputs */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "14px", marginBottom: "8px" }}>
-                <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.84rem", fontWeight: "700", gridColumn: "span 2" }}>
+                <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.84rem", fontWeight: "700", gridColumn: "span 2", color: "#29231E" }}>
                   Full Workshop Address *
                   <input
                     type="text"
@@ -2680,16 +2738,15 @@ export default function RegisterShopFlow({
                     value={address}
                     onChange={(e) => handleRegAddressFieldChange("address", e.target.value)}
                     onBlur={() => handleSyncRegisterAddressToMap()}
+                    className="glass-input"
                     style={{
                       height: "44px",
                       borderRadius: "10px",
-                      border: "1px solid var(--border)",
                       padding: "0 14px",
-                      backgroundColor: "var(--bg)",
                     }}
                   />
                 </label>
-                <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.84rem", fontWeight: "700" }}>
+                <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.84rem", fontWeight: "700", color: "#29231E" }}>
                   City *
                   <input
                     type="text"
@@ -2698,16 +2755,15 @@ export default function RegisterShopFlow({
                     value={city}
                     onChange={(e) => handleRegAddressFieldChange("city", e.target.value)}
                     onBlur={() => handleSyncRegisterAddressToMap()}
+                    className="glass-input"
                     style={{
                       height: "44px",
                       borderRadius: "10px",
-                      border: "1px solid var(--border)",
                       padding: "0 14px",
-                      backgroundColor: "var(--bg)",
                     }}
                   />
                 </label>
-                <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.84rem", fontWeight: "700" }}>
+                <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.84rem", fontWeight: "700", color: "#29231E" }}>
                   PIN Code *
                   <input
                     type="text"
@@ -2717,12 +2773,11 @@ export default function RegisterShopFlow({
                     value={pincode}
                     onChange={(e) => handleRegAddressFieldChange("pincode", e.target.value)}
                     onBlur={() => handleSyncRegisterAddressToMap()}
+                    className="glass-input"
                     style={{
                       height: "44px",
                       borderRadius: "10px",
-                      border: "1px solid var(--border)",
                       padding: "0 14px",
-                      backgroundColor: "var(--bg)",
                     }}
                   />
                 </label>
@@ -2734,13 +2789,11 @@ export default function RegisterShopFlow({
                   type="button"
                   onClick={() => handleSyncRegisterAddressToMap()}
                   disabled={syncingMapLocation}
+                  className="glass-btn-primary"
                   style={{
-                    padding: "7px 15px",
-                    borderRadius: "8px",
-                    backgroundColor: "#FF7900",
-                    color: "#fff",
-                    border: 0,
-                    fontSize: "0.78rem",
+                    padding: "8px 16px",
+                    borderRadius: "10px",
+                    fontSize: "0.8rem",
                     fontWeight: "700",
                     cursor: "pointer",
                     display: "flex",
@@ -2748,8 +2801,8 @@ export default function RegisterShopFlow({
                     gap: "6px",
                   }}
                 >
-                  <MapPin size={13} />
-                  {syncingMapLocation ? "Locating on Map..." : "📍 Auto-Move Map Pin to this Address"}
+                  <MapPin size={14} />
+                  <span>{syncingMapLocation ? "Locating on Map..." : "📍 Auto-Move Map Pin to this Address"}</span>
                 </button>
                 {syncSuccessMsg && (
                   <span style={{ fontSize: "0.76rem", color: "#16a34a", fontWeight: "700" }}>
@@ -3027,19 +3080,24 @@ export default function RegisterShopFlow({
               </div>
 
               {/* Workshop Photo URL */}
-              <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.84rem", fontWeight: "700" }}>
-                Workshop Photo URL <small style={{ color: "var(--muted)" }}>(Optional, e.g. web photo or Google Maps photo)</small>
+              <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.84rem", fontWeight: "700", color: "#29231E" }}>
+                Workshop Photo URL <small style={{ color: "#766B60" }}>(Optional, e.g. web photo or Google Maps photo)</small>
                 <input
-                  type="url"
-                  placeholder="https://..."
+                  type="text"
+                  placeholder="https://... or paste image data URL"
                   value={workshopPhotoUrl}
-                  onChange={(e) => setWorkshopPhotoUrl(e.target.value)}
+                  onChange={(e) => {
+                    setWorkshopPhotoUrl(e.target.value);
+                    if (e.target.value.startsWith("data:image/") || e.target.value.startsWith("http")) {
+                      setShopPhotoPreview(e.target.value);
+                    }
+                  }}
+                  className="glass-input"
                   style={{
                     height: "44px",
                     borderRadius: "10px",
-                    border: "1px solid var(--border)",
                     padding: "0 14px",
-                    backgroundColor: "var(--bg)",
+                    fontSize: "0.85rem",
                   }}
                 />
               </label>
@@ -3048,50 +3106,48 @@ export default function RegisterShopFlow({
             {/* Verification Disclaimer & Submit Button */}
             <div
               style={{
-                backgroundColor: "#fff8ed",
-                border: "1px solid #fedfa7",
-                borderRadius: "12px",
+                backgroundColor: "rgba(248, 244, 238, 0.8)",
+                border: "1px solid rgba(185, 154, 123, 0.45)",
+                backdropFilter: "blur(16px)",
+                WebkitBackdropFilter: "blur(16px)",
+                borderRadius: "14px",
                 padding: "16px 20px",
                 marginBottom: "28px",
                 display: "flex",
                 alignItems: "flex-start",
                 gap: "12px",
+                boxShadow: "0 4px 16px rgba(73, 48, 31, 0.06)",
               }}
             >
-              <Info size={22} style={{ color: "#d98d28", flexShrink: 0, marginTop: "2px" }} />
-              <div style={{ fontSize: "0.82rem", color: "#8c5615", lineHeight: 1.5 }}>
-                <strong>Important Notice on Verification:</strong> Submitting this registration does not automatically make your workshop visible on the public map. Every mechanic shop is independently reviewed and verified by the SEVAIGO team to verify identity, credentials, and location accuracy before public activation.
+              <Info size={22} style={{ color: "#C58A35", flexShrink: 0, marginTop: "2px" }} />
+              <div style={{ fontSize: "0.84rem", color: "#49301F", lineHeight: 1.55 }}>
+                <strong style={{ color: "#29231E" }}>Important Notice on Verification:</strong> Submitting this registration does not automatically make your workshop visible on the public map. Every mechanic shop is independently reviewed and verified by the SEVAIGO team to verify identity, credentials, and location accuracy before public activation.
               </div>
             </div>
 
             <button
               type="submit"
               disabled={submitting}
+              className="glass-btn-primary"
               style={{
                 width: "100%",
-                height: "50px",
-                borderRadius: "12px",
-                backgroundColor: submitting ? "var(--red-dark)" : "var(--red)",
-                opacity: submitting ? 0.8 : 1,
-                color: "#ffffff",
-                border: 0,
-                fontSize: "1rem",
+                height: "54px",
+                borderRadius: "14px",
+                fontSize: "1.02rem",
                 fontWeight: "800",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 gap: "10px",
                 cursor: submitting ? "not-allowed" : "pointer",
-                boxShadow: "0 6px 20px rgba(227, 81, 75, 0.3)",
-                transition: "opacity 0.2s ease, background-color 0.2s ease",
               }}
             >
               {submitting ? (
                 <>
                   <span
                     style={{
-                      width: "18px",
-                      height: "18px",
+                      width: "20px",
+                      height: "20px",
                       border: "2.5px solid rgba(255, 255, 255, 0.35)",
                       borderTopColor: "#ffffff",
                       borderRadius: "50%",
@@ -3099,7 +3155,7 @@ export default function RegisterShopFlow({
                       animation: "spin 0.8s linear infinite",
                     }}
                   />
-                  <span>Registering Workshop...</span>
+                  <span>Registering Workshop to Database...</span>
                 </>
               ) : (
                 <>

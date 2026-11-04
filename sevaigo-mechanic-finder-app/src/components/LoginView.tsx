@@ -319,7 +319,7 @@ export default function LoginView({
         <div
           role="tablist"
           aria-label="Account Login Type"
-          className="mb-5 p-1 rounded-2xl bg-slate-200/70 border border-[#D5DEE5] grid grid-cols-2 gap-1.5"
+          className="mb-5 p-1 rounded-2xl bg-[rgba(107,74,46,0.1)] border border-[rgba(107,74,46,0.22)] backdrop-blur-md grid grid-cols-2 gap-1.5"
         >
           <button
             type="button"
@@ -332,8 +332,8 @@ export default function LoginView({
             }}
             className={`py-3 px-3.5 rounded-xl font-['Manrope'] text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
               loginType === "customer"
-                ? "bg-[#2F6B73] text-white shadow-sm border border-[#2F6B73]"
-                : "bg-white text-[#172033] hover:bg-slate-50 border border-[#D5DEE5]"
+                ? "glass-btn-primary"
+                : "glass-btn-secondary"
             }`}
           >
             <User size={15} />
@@ -351,8 +351,8 @@ export default function LoginView({
             }}
             className={`py-3 px-3.5 rounded-xl font-['Manrope'] text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
               loginType === "mechanic"
-                ? "bg-[#2F6B73] text-white shadow-sm border border-[#2F6B73]"
-                : "bg-white text-[#172033] hover:bg-slate-50 border border-[#D5DEE5]"
+                ? "glass-btn-primary"
+                : "glass-btn-secondary"
             }`}
           >
             <Wrench size={15} />
@@ -361,9 +361,9 @@ export default function LoginView({
         </div>
 
         {/* Card Body */}
-        <div className="p-6 sm:p-7 rounded-2xl bg-[#FFFFFF] border border-[#D5DEE5] shadow-xs">
+        <div className="p-6 sm:p-7 rounded-2xl glass-card">
           {/* Method Selector: Phone OTP vs Email Login */}
-          <div className="flex items-center justify-center gap-4 mb-5 pb-4 border-b border-[#D5DEE5] text-xs font-bold">
+          <div className="flex items-center justify-center gap-4 mb-5 pb-4 border-b border-[rgba(107,74,46,0.18)] text-xs font-bold">
             <button
               type="button"
               onClick={() => {
@@ -372,13 +372,13 @@ export default function LoginView({
               }}
               className={`pb-1 border-b-2 transition-all cursor-pointer ${
                 authMethod === "phone"
-                  ? "border-[#2F6B73] text-[#2F6B73]"
-                  : "border-transparent text-[#64748B] hover:text-[#172033]"
+                  ? "border-[#6B4A2E] text-[#6B4A2E]"
+                  : "border-transparent text-[#766B60] hover:text-[#29231E]"
               }`}
             >
               Phone Number OTP
             </button>
-            <span className="text-slate-300">|</span>
+            <span className="text-[rgba(107,74,46,0.3)]">|</span>
             <button
               type="button"
               onClick={() => {
@@ -387,8 +387,8 @@ export default function LoginView({
               }}
               className={`pb-1 border-b-2 transition-all cursor-pointer ${
                 authMethod === "email"
-                  ? "border-[#2F6B73] text-[#2F6B73]"
-                  : "border-transparent text-[#64748B] hover:text-[#172033]"
+                  ? "border-[#6B4A2E] text-[#6B4A2E]"
+                  : "border-transparent text-[#766B60] hover:text-[#29231E]"
               }`}
             >
               Email & Password
@@ -401,12 +401,12 @@ export default function LoginView({
               {step === "phone" ? (
                 <form onSubmit={handleSendOtp} className="space-y-4">
                   <div>
-                    <label className="text-xs font-bold text-[#172033] block mb-2 flex items-center gap-2">
-                      <Phone size={14} className="text-[#2F6B73]" />
+                    <label className="text-xs font-bold text-[#29231E] block mb-2 flex items-center gap-2">
+                      <Phone size={14} className="text-[#6B4A2E]" />
                       <span>Mobile Number</span>
                     </label>
                     <div className="relative flex items-center">
-                      <div className="absolute left-3.5 flex items-center gap-1 text-xs font-bold text-[#64748B] border-r border-[#D5DEE5] pr-2.5">
+                      <div className="absolute left-3.5 flex items-center gap-1 text-xs font-bold text-[#766B60] border-r border-[rgba(107,74,46,0.22)] pr-2.5">
                         <span>🇮🇳</span>
                         <span>+91</span>
                       </div>
@@ -421,14 +421,14 @@ export default function LoginView({
                         }}
                         placeholder="98765 43210"
                         autoFocus
-                        className="w-full pl-24 pr-4 h-12 rounded-xl bg-[#F8FAFC] border border-[#D5DEE5] text-[#172033] font-mono text-sm font-bold tracking-wider placeholder:text-[#94A3B8] focus:outline-none focus:border-[#2F6B73] focus:bg-[#FFFFFF] transition-colors"
+                        className="w-full pl-24 pr-4 h-12 rounded-xl glass-input font-mono text-sm font-bold tracking-wider"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold text-[#64748B] block mb-2 flex items-center gap-2">
-                      <User size={14} className="text-[#64748B]" />
+                    <label className="text-xs font-bold text-[#766B60] block mb-2 flex items-center gap-2">
+                      <User size={14} className="text-[#766B60]" />
                       <span>Full Name (Optional)</span>
                     </label>
                     <input
@@ -437,7 +437,7 @@ export default function LoginView({
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder={loginType === "mechanic" ? "e.g. Master Mechanic Ajmal" : "e.g. Ajmal Hussain"}
-                      className="w-full px-4 h-12 rounded-xl bg-[#F8FAFC] border border-[#D5DEE5] text-[#172033] text-sm font-medium placeholder:text-[#94A3B8] focus:outline-none focus:border-[#2F6B73] focus:bg-[#FFFFFF] transition-colors"
+                      className="w-full px-4 h-12 rounded-xl glass-input text-sm font-medium"
                     />
                   </div>
 
@@ -451,7 +451,7 @@ export default function LoginView({
                     <button
                       type="submit"
                       disabled={loading || phone.replace(/\D/g, "").length !== 10}
-                      className="w-full h-12 rounded-xl bg-[#2F6B73] hover:bg-[#24545A] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm tracking-wide shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      className="w-full h-12 rounded-xl glass-btn-primary disabled:opacity-50 disabled:cursor-not-allowed font-bold text-sm tracking-wide shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
                     >
                       {loading ? (
                         <>
@@ -508,8 +508,8 @@ export default function LoginView({
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold text-[#172033] block mb-1.5 flex items-center gap-1.5">
-                      <Lock size={14} className="text-[#2F6B73]" />
+                    <label className="text-xs font-bold text-[#29231E] block mb-1.5 flex items-center gap-1.5">
+                      <Lock size={14} className="text-[#6B4A2E]" />
                       <span>Enter 6-Digit Code</span>
                     </label>
                     <input
@@ -523,7 +523,7 @@ export default function LoginView({
                       }}
                       placeholder="••••••"
                       autoFocus
-                      className="w-full text-center h-14 rounded-xl bg-[#F8FAFC] border border-[#D5DEE5] text-[#172033] font-mono text-2xl font-black tracking-[0.5em] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#2F6B73] focus:bg-[#FFFFFF] transition-colors"
+                      className="w-full text-center h-14 rounded-xl glass-input font-mono text-2xl font-black tracking-[0.5em]"
                     />
                   </div>
 
@@ -536,7 +536,7 @@ export default function LoginView({
                   <button
                     type="submit"
                     disabled={loading || isVerifying || otpInput.trim().length !== 6}
-                    className="w-full h-12 rounded-xl bg-[#2F6B73] hover:bg-[#24545A] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm tracking-wide shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full h-12 rounded-xl glass-btn-primary disabled:opacity-50 disabled:cursor-not-allowed font-bold text-sm tracking-wide shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
                     {isVerifying || loading ? (
                       <>
@@ -663,7 +663,7 @@ export default function LoginView({
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full h-12 rounded-xl bg-[#2F6B73] hover:bg-[#24545A] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm tracking-wide shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full h-12 rounded-xl glass-btn-primary disabled:opacity-50 disabled:cursor-not-allowed font-bold text-sm tracking-wide shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {loading ? (
                     <>
@@ -680,7 +680,7 @@ export default function LoginView({
               </div>
 
               {/* Sign Up / Log In Toggle */}
-              <div className="text-center pt-2 text-xs text-[#64748B]">
+              <div className="text-center pt-2 text-xs text-[#766B60]">
                 {isRegistering ? (
                   <span>
                     Already have an account?{" "}
@@ -690,7 +690,7 @@ export default function LoginView({
                         setIsRegistering(false);
                         setError("");
                       }}
-                      className="font-bold text-[#2F6B73] hover:underline ml-1"
+                      className="font-bold text-[#6B4A2E] hover:underline ml-1"
                     >
                       Log In
                     </button>
@@ -704,7 +704,7 @@ export default function LoginView({
                         setIsRegistering(true);
                         setError("");
                       }}
-                      className="font-bold text-[#2F6B73] hover:underline ml-1"
+                      className="font-bold text-[#6B4A2E] hover:underline ml-1"
                     >
                       Sign Up
                     </button>
@@ -716,11 +716,11 @@ export default function LoginView({
 
           {/* Mechanic Workshop Registration Button (for Mechanic Mode) */}
           {loginType === "mechanic" && onRegisterWorkshop && (
-            <div className="mt-5 pt-4 text-center border-t border-[#D5DEE5]">
+            <div className="mt-5 pt-4 text-center border-t border-[rgba(107,74,46,0.18)]">
               <button
                 type="button"
                 onClick={onRegisterWorkshop}
-                className="w-full py-2.5 px-3 rounded-xl bg-[#EAF4FF] hover:bg-blue-100/80 border border-[#BFDBFE] text-[#2F6B73] text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                className="w-full py-3 px-3 rounded-xl bg-[rgba(107,74,46,0.12)] hover:bg-[rgba(107,74,46,0.2)] border border-[rgba(107,74,46,0.25)] text-[#6B4A2E] text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
               >
                 <Store size={15} />
                 <span>New Workshop? Register Your Shop Now (புதிய மெக்கானிக் பதிவு)</span>
@@ -731,7 +731,7 @@ export default function LoginView({
       </div>
 
       {/* Footer Branding */}
-      <div className="text-center py-4 text-[11px] text-[#64748B]">
+      <div className="text-center py-4 text-[11px] text-[#766B60]">
         SevaiGo Emergency Roadside Assistance · 24/7 Verified Network
       </div>
     </div>

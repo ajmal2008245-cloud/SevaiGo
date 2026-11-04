@@ -635,30 +635,30 @@ export default function CustomerDashboard({
   });
 
   return (
-    <div className="min-h-screen w-full bg-[#F4FAFC] text-[#172033] pb-24 font-['DM_Sans',sans-serif] overflow-x-hidden">
+    <div className="min-h-screen w-full text-[#29231E] pb-24 font-['DM_Sans',sans-serif] overflow-x-hidden">
       {/* 1. Header with Clean Branding & Hamburger Menu on Right */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#D5DEE5] px-4 py-3 sm:px-6">
+      <header className="sticky top-0 z-40 glass-nav px-4 py-3 sm:px-6">
         <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
           {/* Brand Logo & Wordmark */}
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl overflow-hidden bg-gradient-to-br from-[#2F6B73] to-[#1E484E] flex items-center justify-center border border-white/20 shadow-xs">
+            <div className="w-9 h-9 rounded-xl overflow-hidden bg-gradient-to-br from-[#6B4A2E] to-[#49301F] flex items-center justify-center border border-white/30 shadow-xs">
               <svg className="w-5 h-5 text-white" viewBox="0 0 48 48" fill="none">
                 <path d="M11 42L20 6H28L37 42" stroke="#FFFFFF" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
-                <line x1="24" y1="10" x2="24" y2="17" stroke="#38BDF8" strokeWidth="3" strokeLinecap="round" />
-                <line x1="24" y1="23" x2="24" y2="30" stroke="#38BDF8" strokeWidth="3" strokeLinecap="round" />
-                <line x1="24" y1="36" x2="24" y2="41" stroke="#38BDF8" strokeWidth="3" strokeLinecap="round" />
+                <line x1="24" y1="10" x2="24" y2="17" stroke="#B99A7B" strokeWidth="3" strokeLinecap="round" />
+                <line x1="24" y1="23" x2="24" y2="30" stroke="#B99A7B" strokeWidth="3" strokeLinecap="round" />
+                <line x1="24" y1="36" x2="24" y2="41" stroke="#B99A7B" strokeWidth="3" strokeLinecap="round" />
               </svg>
             </div>
             <div>
               <div className="flex items-center gap-1.5 leading-none">
-                <span className="text-lg font-black font-['Manrope'] tracking-tight text-[#172033]">
-                  Sevai<span className="text-[#2F6B73]">Go</span>
+                <span className="text-lg font-black font-['Manrope'] tracking-tight text-[#29231E]">
+                  Sevai<span className="text-[#6B4A2E]">Go</span>
                 </span>
-                <span className="px-2 py-0.5 rounded-full bg-[#EAF4FF] text-[#2F6B73] border border-[#BFDBFE] text-[10px] font-bold uppercase tracking-wider">
+                <span className="px-2 py-0.5 rounded-full bg-[rgba(107,74,46,0.12)] text-[#6B4A2E] border border-[rgba(107,74,46,0.25)] text-[10px] font-bold uppercase tracking-wider">
                   Customer
                 </span>
               </div>
-              <span className="text-[11px] text-[#64748B] font-medium">Roadside Breakdown Rescue</span>
+              <span className="text-[11px] text-[#766B60] font-medium">Roadside Breakdown Rescue</span>
             </div>
           </div>
 
@@ -666,7 +666,7 @@ export default function CustomerDashboard({
           <button
             type="button"
             onClick={() => setMenuOpen(!menuOpen)}
-            className="p-2.5 rounded-xl border border-[#D5DEE5] bg-white hover:bg-slate-50 text-[#172033] shadow-xs transition-colors cursor-pointer flex items-center justify-center"
+            className="p-2.5 rounded-xl border border-[rgba(107,74,46,0.22)] bg-white/70 hover:bg-white text-[#29231E] shadow-xs backdrop-blur-md transition-colors cursor-pointer flex items-center justify-center"
             title="Open Menu"
             aria-label="Open Navigation Menu"
             aria-expanded={menuOpen}
@@ -686,16 +686,16 @@ export default function CustomerDashboard({
           />
 
           {/* Slide-out Drawer */}
-          <div className="relative z-10 w-full max-w-xs h-full bg-white border-l border-[#D5DEE5] shadow-2xl flex flex-col justify-between p-5 animate-in slide-in-from-right duration-200">
+          <div className="relative z-10 w-full max-w-xs h-full bg-[#F8F4EE]/95 backdrop-blur-xl border-l border-[rgba(107,74,46,0.22)] shadow-2xl flex flex-col justify-between p-5 animate-in slide-in-from-right duration-200">
             <div>
               {/* Drawer Header */}
-              <div className="flex items-center justify-between pb-4 border-b border-[#D5DEE5] mb-4">
+              <div className="flex items-center justify-between pb-4 border-b border-[rgba(107,74,46,0.18)] mb-4">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-full bg-[#EAF4FF] text-[#2F6B73] font-bold text-xs flex items-center justify-center border border-[#BFDBFE]">
+                  <div className="w-9 h-9 rounded-full bg-[rgba(107,74,46,0.12)] text-[#6B4A2E] font-bold text-xs flex items-center justify-center border border-[rgba(107,74,46,0.25)]">
                     <User size={16} />
                   </div>
                   <div>
-                    <span className="text-xs font-bold text-[#172033] block">
+                    <span className="text-xs font-bold text-[#29231E] block">
                       {user.phone ? `+91 ${user.phone}` : (user.name || "Customer")}
                     </span>
                     <span className="text-[10px] text-[#166534] bg-[#DCFCE7] px-1.5 py-0.5 rounded border border-[#86EFAC] font-semibold">
@@ -706,7 +706,7 @@ export default function CustomerDashboard({
                 <button
                   type="button"
                   onClick={() => setMenuOpen(false)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-[#172033] hover:bg-slate-100 transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-[#29231E] hover:bg-white/60 transition-colors cursor-pointer"
                   aria-label="Close Menu"
                 >
                   <X size={18} />
@@ -714,7 +714,7 @@ export default function CustomerDashboard({
               </div>
 
               {/* Navigation Options */}
-              <div className="space-y-1 text-sm font-semibold text-[#172033]">
+              <div className="space-y-1 text-sm font-semibold text-[#29231E]">
                 <button
                   type="button"
                   onClick={() => {
@@ -723,11 +723,11 @@ export default function CustomerDashboard({
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl transition-colors text-left cursor-pointer ${
                     activeTab === "dashboard"
-                      ? "bg-[#EAF4FF] text-[#2F6B73] font-bold border border-[#BFDBFE]"
-                      : "hover:bg-slate-50"
+                      ? "bg-[rgba(107,74,46,0.14)] text-[#6B4A2E] font-bold border border-[rgba(107,74,46,0.25)]"
+                      : "hover:bg-white/60"
                   }`}
                 >
-                  <LayoutDashboard size={18} className={activeTab === "dashboard" ? "text-[#2F6B73]" : "text-[#64748B]"} />
+                  <LayoutDashboard size={18} className={activeTab === "dashboard" ? "text-[#6B4A2E]" : "text-[#766B60]"} />
                   <span>Dashboard (Breakdown Rescue)</span>
                 </button>
 
@@ -739,11 +739,11 @@ export default function CustomerDashboard({
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl transition-colors text-left cursor-pointer ${
                     activeTab === "bookings"
-                      ? "bg-[#EAF4FF] text-[#2F6B73] font-bold border border-[#BFDBFE]"
-                      : "hover:bg-slate-50"
+                      ? "bg-[rgba(107,74,46,0.14)] text-[#6B4A2E] font-bold border border-[rgba(107,74,46,0.25)]"
+                      : "hover:bg-white/60"
                   }`}
                 >
-                  <Clock size={18} className={activeTab === "bookings" ? "text-[#2F6B73]" : "text-[#64748B]"} />
+                  <Clock size={18} className={activeTab === "bookings" ? "text-[#6B4A2E]" : "text-[#766B60]"} />
                   <span>My Bookings</span>
                 </button>
 
@@ -755,11 +755,11 @@ export default function CustomerDashboard({
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl transition-colors text-left cursor-pointer ${
                     activeTab === "profile"
-                      ? "bg-[#EAF4FF] text-[#2F6B73] font-bold border border-[#BFDBFE]"
-                      : "hover:bg-slate-50"
+                      ? "bg-[rgba(107,74,46,0.14)] text-[#6B4A2E] font-bold border border-[rgba(107,74,46,0.25)]"
+                      : "hover:bg-white/60"
                   }`}
                 >
-                  <User size={18} className={activeTab === "profile" ? "text-[#2F6B73]" : "text-[#64748B]"} />
+                  <User size={18} className={activeTab === "profile" ? "text-[#6B4A2E]" : "text-[#766B60]"} />
                   <span>Profile & Vehicles</span>
                 </button>
 
@@ -769,9 +769,9 @@ export default function CustomerDashboard({
                     setHelpOpen(true);
                     setMenuOpen(false);
                   }}
-                  className="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl hover:bg-slate-50 transition-colors text-left cursor-pointer"
+                  className="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl hover:bg-white/60 transition-colors text-left cursor-pointer"
                 >
-                  <HelpCircle size={18} className="text-[#64748B]" />
+                  <HelpCircle size={18} className="text-[#766B60]" />
                   <span>Help & Support</span>
                 </button>
               </div>
@@ -828,47 +828,47 @@ export default function CustomerDashboard({
       <main className="max-w-2xl mx-auto px-3.5 sm:px-4 py-4 sm:py-5 space-y-5">
         {/* VIEW 1: MY BOOKINGS TAB */}
         {activeTab === "bookings" && (
-          <div className="bg-white rounded-2xl border border-[#D5DEE5] shadow-xs p-5 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-[#D5DEE5]">
+          <div className="glass-card p-5 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[rgba(107,74,46,0.18)]">
               <div className="flex items-center gap-2">
-                <Clock className="text-[#2F6B73]" size={18} />
-                <h2 className="text-base font-bold text-[#172033]">My Rescue Bookings</h2>
+                <Clock className="text-[#6B4A2E]" size={18} />
+                <h2 className="text-base font-bold text-[#29231E]">My Rescue Bookings</h2>
               </div>
               <button
                 type="button"
                 onClick={() => setActiveTab("dashboard")}
-                className="text-xs font-bold text-[#2F6B73] hover:underline"
+                className="text-xs font-bold text-[#6B4A2E] hover:underline"
               >
                 Back to Breakdown Request
               </button>
             </div>
 
             {activeRescue ? (
-              <div className="p-4 rounded-xl bg-[#EAF4FF] border border-[#BFDBFE] space-y-2">
+              <div className="p-4 rounded-xl bg-[rgba(107,74,46,0.1)] border border-[rgba(107,74,46,0.22)] space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-[#172033]">{activeRescue.shop.shopName}</span>
+                  <span className="text-xs font-bold text-[#29231E]">{activeRescue.shop.shopName}</span>
                   <span className="px-2 py-0.5 rounded-full bg-[#DCFCE7] text-[#166534] text-[10px] font-bold border border-[#86EFAC]">
                     {activeRescue.status === "arrived" ? "Arrived" : "On the way"}
                   </span>
                 </div>
-                <p className="text-xs text-[#64748B]">Issue: {issue}</p>
-                <p className="text-xs text-[#64748B]">ETA: ~{activeRescue.etaMinutes} mins ({activeRescue.distanceKm} km)</p>
+                <p className="text-xs text-[#766B60]">Issue: {issue}</p>
+                <p className="text-xs text-[#766B60]">ETA: ~{activeRescue.etaMinutes} mins ({activeRescue.distanceKm} km)</p>
                 <button
                   type="button"
                   onClick={() => setActiveTab("dashboard")}
-                  className="mt-2 w-full h-10 rounded-xl bg-[#2F6B73] text-white text-xs font-bold"
+                  className="mt-2 w-full h-10 rounded-xl glass-btn-primary text-xs font-bold"
                 >
                   View Live Map Tracking
                 </button>
               </div>
             ) : (
-              <div className="text-center py-8 text-xs text-[#64748B] space-y-2">
-                <Wrench className="mx-auto text-slate-400" size={28} />
+              <div className="text-center py-8 text-xs text-[#766B60] space-y-2">
+                <Wrench className="mx-auto text-[#B99A7B]" size={28} />
                 <p>No active rescue bookings currently underway.</p>
                 <button
                   type="button"
                   onClick={() => setActiveTab("dashboard")}
-                  className="px-4 py-2 rounded-xl bg-[#2F6B73] text-white font-bold"
+                  className="px-4 py-2 rounded-xl glass-btn-primary font-bold"
                 >
                   Request Roadside Assistance
                 </button>
@@ -879,43 +879,43 @@ export default function CustomerDashboard({
 
         {/* VIEW 2: PROFILE TAB */}
         {activeTab === "profile" && (
-          <div className="bg-white rounded-2xl border border-[#D5DEE5] shadow-xs p-5 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-[#D5DEE5]">
+          <div className="glass-card p-5 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[rgba(107,74,46,0.18)]">
               <div className="flex items-center gap-2">
-                <User className="text-[#2F6B73]" size={18} />
-                <h2 className="text-base font-bold text-[#172033]">Rider Profile & Settings</h2>
+                <User className="text-[#6B4A2E]" size={18} />
+                <h2 className="text-base font-bold text-[#29231E]">Rider Profile & Settings</h2>
               </div>
               <button
                 type="button"
                 onClick={() => setActiveTab("dashboard")}
-                className="text-xs font-bold text-[#2F6B73] hover:underline"
+                className="text-xs font-bold text-[#6B4A2E] hover:underline"
               >
                 Back to Dashboard
               </button>
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className="p-3.5 rounded-xl bg-[#F8FAFC] border border-[#D5DEE5] flex justify-between items-center">
-                <span className="text-[#64748B]">Registered Mobile Number</span>
-                <span className="font-bold text-[#172033] font-mono">
+              <div className="p-3.5 rounded-xl bg-white/60 border border-[rgba(107,74,46,0.18)] flex justify-between items-center">
+                <span className="text-[#766B60]">Registered Mobile Number</span>
+                <span className="font-bold text-[#29231E] font-mono">
                   {user.phone ? `+91 ${user.phone}` : (user.email || "Registered")}
                 </span>
               </div>
-              <div className="p-3.5 rounded-xl bg-[#F8FAFC] border border-[#D5DEE5] flex justify-between items-center">
-                <span className="text-[#64748B]">Account Type</span>
+              <div className="p-3.5 rounded-xl bg-white/60 border border-[rgba(107,74,46,0.18)] flex justify-between items-center">
+                <span className="text-[#766B60]">Account Type</span>
                 <span className="font-bold text-[#166534] bg-[#DCFCE7] px-2 py-0.5 rounded-full border border-[#86EFAC]">
                   Verified Customer
                 </span>
               </div>
-              <div className="p-3.5 rounded-xl bg-[#F8FAFC] border border-[#D5DEE5] flex justify-between items-center">
-                <span className="text-[#64748B]">Preferred Vehicle</span>
-                <span className="font-bold text-[#172033]">
+              <div className="p-3.5 rounded-xl bg-white/60 border border-[rgba(107,74,46,0.18)] flex justify-between items-center">
+                <span className="text-[#766B60]">Preferred Vehicle</span>
+                <span className="font-bold text-[#29231E]">
                   {vehicleType === "2w" ? "2-Wheeler (Motorcycle)" : "4-Wheeler (Car)"}
                 </span>
               </div>
-              <div className="p-3.5 rounded-xl bg-[#F8FAFC] border border-[#D5DEE5] flex justify-between items-center">
-                <span className="text-[#64748B]">Emergency Helpline</span>
-                <span className="font-bold text-[#2F6B73] font-mono">1800-SEVAIGO (24/7)</span>
+              <div className="p-3.5 rounded-xl bg-white/60 border border-[rgba(107,74,46,0.18)] flex justify-between items-center">
+                <span className="text-[#766B60]">Emergency Helpline</span>
+                <span className="font-bold text-[#6B4A2E] font-mono">1800-SEVAIGO (24/7)</span>
               </div>
             </div>
           </div>
@@ -1051,18 +1051,18 @@ export default function CustomerDashboard({
             )}
 
             {/* Section 1: Breakdown Details Form */}
-            <div className="bg-white rounded-2xl border border-[#D5DEE5] shadow-xs p-4 sm:p-5 space-y-4 sm:space-y-5 max-w-full overflow-hidden">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[#D5DEE5]">
+            <div className="glass-card p-4 sm:p-5 space-y-4 sm:space-y-5 max-w-full overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[rgba(107,74,46,0.18)]">
                 <div>
-                  <h1 className="text-base sm:text-lg font-black text-[#172033] font-['Manrope']">
+                  <h1 className="text-base sm:text-lg font-black text-[#29231E] font-['Manrope']">
                     Current Bike Breakdown Details
                   </h1>
-                  <p className="text-xs text-[#64748B] mt-0.5">
+                  <p className="text-xs text-[#766B60] mt-0.5">
                     Provide breakdown info to dispatch the nearest verified mechanic within 7 km
                   </p>
                 </div>
                 <span
-                  className="self-start sm:self-auto px-2.5 py-1 rounded-full bg-[#EAF4FF] text-[#2F6B73] border border-[#BFDBFE] text-xs font-bold tracking-wide shrink-0"
+                  className="self-start sm:self-auto px-2.5 py-1 rounded-full bg-[rgba(107,74,46,0.12)] text-[#6B4A2E] border border-[rgba(107,74,46,0.25)] text-xs font-bold tracking-wide shrink-0"
                   aria-label="Step 1 of 2: Breakdown Details"
                 >
                   Step 1 of 2
@@ -1071,20 +1071,20 @@ export default function CustomerDashboard({
 
               {/* Location Bar with Live GPS & Location Typing */}
               <div>
-                <label className="text-xs font-extrabold text-[#172033] block mb-1.5 flex items-center gap-1.5">
-                  <MapPin size={14} className="text-[#2F6B73]" />
+                <label className="text-xs font-extrabold text-[#29231E] block mb-1.5 flex items-center gap-1.5">
+                  <MapPin size={14} className="text-[#6B4A2E]" />
                   <span>Current Bike Breakdown Location *</span>
                 </label>
                 
                 {/* Responsive Location Box & Detect GPS Button */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                  <div className="flex-1 min-h-[46px] py-2 px-3.5 rounded-xl bg-[#F8FAFC] border border-[#D5DEE5] flex items-center justify-between gap-2 text-xs">
+                  <div className="flex-1 min-h-[46px] py-2 px-3.5 rounded-xl bg-white/60 border border-[rgba(107,74,46,0.22)] flex items-center justify-between gap-2 text-xs">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <MapPin size={16} className={detectingGps ? "text-[#2F6B73] animate-bounce shrink-0" : "text-[#2F6B73] shrink-0"} />
-                      <span className="font-semibold text-[#172033] truncate">
+                      <MapPin size={16} className={detectingGps ? "text-[#6B4A2E] animate-bounce shrink-0" : "text-[#6B4A2E] shrink-0"} />
+                      <span className="font-semibold text-[#29231E] truncate">
                         {detectingGps ? (
-                          <span className="flex items-center gap-1.5 text-[#2F6B73]">
-                            <span className="inline-block w-2 h-2 rounded-full bg-[#2F6B73] animate-ping" />
+                          <span className="flex items-center gap-1.5 text-[#6B4A2E]">
+                            <span className="inline-block w-2 h-2 rounded-full bg-[#6B4A2E] animate-ping" />
                             Detecting live GPS coordinates...
                           </span>
                         ) : (
@@ -1094,13 +1094,13 @@ export default function CustomerDashboard({
                     </div>
                     {latitude !== null && longitude !== null ? (
                       <span
-                        className="text-[10px] text-[#2F6B73] font-mono shrink-0 bg-teal-50 px-2 py-0.5 rounded-md border border-[#BFDBFE] font-bold"
+                        className="text-[10px] text-[#6B4A2E] font-mono shrink-0 bg-[rgba(107,74,46,0.1)] px-2 py-0.5 rounded-md border border-[rgba(107,74,46,0.25)] font-bold"
                         title={locationAccuracy ? `Accuracy: ±${Math.round(locationAccuracy)} meters` : undefined}
                       >
                         {latitude.toFixed(4)}, {longitude.toFixed(4)}
                       </span>
                     ) : (
-                      <span className="text-[10px] text-slate-400 font-mono shrink-0 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                      <span className="text-[10px] text-[#766B60] font-mono shrink-0 bg-white/70 px-2 py-0.5 rounded border border-[rgba(107,74,46,0.2)]">
                         GPS Not Set
                       </span>
                     )}
@@ -1109,7 +1109,7 @@ export default function CustomerDashboard({
                     type="button"
                     onClick={() => detectLocation(true)}
                     disabled={detectingGps}
-                    className="h-11 px-4 rounded-xl bg-[#2F6B73] hover:bg-[#24545A] disabled:opacity-50 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shrink-0 shadow-xs active:scale-98"
+                    className="h-11 px-4 rounded-xl glass-btn-primary disabled:opacity-50 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shrink-0"
                     title="Detect current GPS location"
                   >
                     <LocateFixed size={16} className={detectingGps ? "animate-spin text-white" : "text-white"} />
@@ -1119,22 +1119,22 @@ export default function CustomerDashboard({
 
                 {/* GPS Notice / Error Banner if Permission Denied or Failed */}
                 {locationError && (
-                  <div className="mt-3 p-3.5 sm:p-4 rounded-2xl bg-amber-50 border border-amber-200 text-[#172033] shadow-xs">
+                  <div className="mt-3 p-3.5 sm:p-4 rounded-2xl bg-[#FFFBF5] border border-[#E8D4BE] text-[#29231E] shadow-xs">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center shrink-0 mt-0.5">
+                        <div className="w-8 h-8 rounded-xl bg-[rgba(107,74,46,0.12)] text-[#6B4A2E] flex items-center justify-center shrink-0 mt-0.5">
                           <AlertTriangle size={18} />
                         </div>
                         <div>
-                          <h4 className="text-xs font-bold text-amber-950 flex items-center gap-1.5 flex-wrap">
+                          <h4 className="text-xs font-bold text-[#49301F] flex items-center gap-1.5 flex-wrap">
                             <span>{locationError.title}</span>
                             {locationError.type === "permission_denied" && (
-                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 font-bold uppercase tracking-wide">
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[rgba(107,74,46,0.15)] text-[#6B4A2E] font-bold uppercase tracking-wide">
                                 Permission Blocked
                               </span>
                             )}
                           </h4>
-                          <p className="text-xs text-amber-900 mt-1 leading-relaxed">
+                          <p className="text-xs text-[#766B60] mt-1 leading-relaxed">
                             {locationError.message}
                           </p>
                         </div>
@@ -1142,7 +1142,7 @@ export default function CustomerDashboard({
                       <button
                         type="button"
                         onClick={() => setLocationError(null)}
-                        className="text-amber-700 hover:text-amber-950 p-1 rounded-lg hover:bg-amber-100 transition-colors shrink-0"
+                        className="text-[#766B60] hover:text-[#29231E] p-1 rounded-lg hover:bg-black/5 transition-colors shrink-0"
                         title="Dismiss notice"
                       >
                         <X size={16} />
@@ -1151,11 +1151,11 @@ export default function CustomerDashboard({
 
                     {/* Step-by-step instructions for Android Chrome / Mobile browser / Desktop */}
                     {locationError.instructions && locationError.instructions.length > 0 && (
-                      <div className="mt-2.5 pt-2.5 border-t border-amber-200/80">
-                        <p className="text-[11px] font-bold text-amber-950 mb-1">
+                      <div className="mt-2.5 pt-2.5 border-t border-[rgba(107,74,46,0.15)]">
+                        <p className="text-[11px] font-bold text-[#49301F] mb-1">
                           How to enable location in your browser:
                         </p>
-                        <ul className="space-y-1 text-[11px] text-amber-900/90 pl-3.5 list-disc">
+                        <ul className="space-y-1 text-[11px] text-[#766B60] pl-3.5 list-disc">
                           {locationError.instructions.map((inst, idx) => (
                             <li key={idx} className="leading-snug">
                               {inst}
@@ -1166,12 +1166,12 @@ export default function CustomerDashboard({
                     )}
 
                     {/* Action buttons */}
-                    <div className="mt-3 pt-2.5 border-t border-amber-200/60 flex flex-wrap items-center gap-2">
+                    <div className="mt-3 pt-2.5 border-t border-[rgba(107,74,46,0.15)] flex flex-wrap items-center gap-2">
                       <button
                         type="button"
                         onClick={() => detectLocation(true)}
                         disabled={detectingGps}
-                        className="h-9 px-3.5 rounded-xl bg-[#2F6B73] hover:bg-[#24545A] disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                        className="h-9 px-3.5 rounded-xl glass-btn-primary disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
                       >
                         <RefreshCw size={13} className={detectingGps ? "animate-spin" : ""} />
                         <span>{detectingGps ? "Retrying GPS..." : "Retry GPS"}</span>
@@ -1179,9 +1179,9 @@ export default function CustomerDashboard({
                       <button
                         type="button"
                         onClick={() => setShowBreakdownMap(true)}
-                        className="h-9 px-3 rounded-xl bg-white hover:bg-amber-100/60 text-[#172033] border border-amber-300 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                        className="h-9 px-3 rounded-xl bg-white/70 hover:bg-white text-[#29231E] border border-[rgba(107,74,46,0.25)] text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
                       >
-                        <MapPin size={13} className="text-[#2F6B73]" />
+                        <MapPin size={13} className="text-[#6B4A2E]" />
                         <span>📍 Pick on Map</span>
                       </button>
                     </div>
@@ -1247,7 +1247,7 @@ export default function CustomerDashboard({
 
               {/* Vehicle Type (2W / 4W) */}
               <div>
-                <label className="text-xs font-extrabold text-[#172033] block mb-2">
+                <label className="text-xs font-extrabold text-[#29231E] block mb-2">
                   Vehicle Type *
                 </label>
                 <div className="grid grid-cols-1 min-[440px]:grid-cols-2 gap-2.5 sm:gap-3">
@@ -1256,11 +1256,11 @@ export default function CustomerDashboard({
                     onClick={() => setVehicleType("2w")}
                     className={`h-12 rounded-xl border-2 flex items-center justify-center gap-2.5 font-bold text-xs sm:text-sm transition-all cursor-pointer ${
                       vehicleType === "2w"
-                        ? "bg-[#EAF4FF] border-[#3B82F6] text-[#172033] shadow-xs"
-                        : "bg-white border-[#D5DEE5] text-[#172033] hover:border-slate-300"
+                        ? "bg-[rgba(107,74,46,0.14)] border-[#6B4A2E] text-[#49301F] shadow-xs"
+                        : "bg-white/70 border-[rgba(107,74,46,0.2)] text-[#766B60] hover:border-[#6B4A2E]"
                     }`}
                   >
-                    <Bike size={22} strokeWidth={2.4} className={vehicleType === "2w" ? "text-[#2F6B73]" : "text-[#64748B]"} />
+                    <Bike size={22} strokeWidth={2.4} className={vehicleType === "2w" ? "text-[#6B4A2E]" : "text-[#766B60]"} />
                     <span>2-Wheeler (Bike / Scooter)</span>
                   </button>
                   <button
@@ -1268,11 +1268,11 @@ export default function CustomerDashboard({
                     onClick={() => setVehicleType("4w")}
                     className={`h-12 rounded-xl border-2 flex items-center justify-center gap-2.5 font-bold text-xs sm:text-sm transition-all cursor-pointer ${
                       vehicleType === "4w"
-                        ? "bg-[#EAF4FF] border-[#3B82F6] text-[#172033] shadow-xs"
-                        : "bg-white border-[#D5DEE5] text-[#172033] hover:border-slate-300"
+                        ? "bg-[rgba(107,74,46,0.14)] border-[#6B4A2E] text-[#49301F] shadow-xs"
+                        : "bg-white/70 border-[rgba(107,74,46,0.2)] text-[#766B60] hover:border-[#6B4A2E]"
                     }`}
                   >
-                    <Car size={22} strokeWidth={2.4} className={vehicleType === "4w" ? "text-[#2F6B73]" : "text-[#64748B]"} />
+                    <Car size={22} strokeWidth={2.4} className={vehicleType === "4w" ? "text-[#6B4A2E]" : "text-[#766B60]"} />
                     <span>4-Wheeler (Car / Van)</span>
                   </button>
                 </div>
@@ -1280,7 +1280,7 @@ export default function CustomerDashboard({
 
               {/* Breakdown Issue */}
               <div>
-                <label className="text-xs font-extrabold text-[#172033] block mb-2">
+                <label className="text-xs font-extrabold text-[#29231E] block mb-2">
                   Breakdown Issue *
                 </label>
                 <div className="grid grid-cols-1 min-[390px]:grid-cols-2 sm:grid-cols-3 gap-2">
@@ -1293,12 +1293,12 @@ export default function CustomerDashboard({
                         onClick={() => setIssue(item.id)}
                         className={`p-3 rounded-xl border-2 text-left flex flex-col justify-between transition-all cursor-pointer ${
                           isSelected
-                            ? "bg-[#EAF4FF] border-[#3B82F6] shadow-xs"
-                            : "bg-white border-[#D5DEE5] hover:border-slate-300"
+                            ? "bg-[rgba(107,74,46,0.14)] border-[#6B4A2E] shadow-xs"
+                            : "bg-white/70 border-[rgba(107,74,46,0.2)] hover:border-[#6B4A2E]"
                         }`}
                       >
-                        <span className="text-xs font-bold text-[#172033] leading-snug">{item.label}</span>
-                        <span className={`text-[11px] mt-1.5 font-bold ${isSelected ? "text-[#2F6B73]" : "text-[#64748B]"}`}>
+                        <span className="text-xs font-bold text-[#29231E] leading-snug">{item.label}</span>
+                        <span className={`text-[11px] mt-1.5 font-bold ${isSelected ? "text-[#6B4A2E]" : "text-[#766B60]"}`}>
                           {item.est}
                         </span>
                       </button>
@@ -1312,18 +1312,18 @@ export default function CustomerDashboard({
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Any landmark or details (e.g. Near bus stop, tyre puncture)"
-                  className="mt-2.5 w-full h-11 px-3.5 rounded-xl bg-[#F8FAFC] border border-[#D5DEE5] text-xs text-[#172033] focus:outline-none focus:border-[#2F6B73]"
+                  className="mt-2.5 w-full h-11 px-3.5 rounded-xl glass-input text-xs"
                 />
               </div>
 
               {/* Attach Photo of Bike / Breakdown (Optional) */}
               <div>
-                <label className="text-xs font-extrabold text-[#172033] block mb-2 flex items-center justify-between">
+                <label className="text-xs font-extrabold text-[#29231E] block mb-2 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
-                    <Camera size={14} className="text-[#2F6B73]" />
+                    <Camera size={14} className="text-[#6B4A2E]" />
                     <span>Attach Photo of Bike / Breakdown (Optional)</span>
                   </span>
-                  <span className="text-[11px] text-[#64748B] font-normal">Helps mechanic bring right tools</span>
+                  <span className="text-[11px] text-[#766B60] font-normal">Helps mechanic bring right tools</span>
                 </label>
 
                 <input
@@ -1336,7 +1336,7 @@ export default function CustomerDashboard({
                 />
 
                 {photoPreview ? (
-                  <div className="relative w-full h-36 rounded-xl overflow-hidden border border-[#D5DEE5] bg-slate-50">
+                  <div className="relative w-full h-36 rounded-xl overflow-hidden border border-[rgba(107,74,46,0.25)] bg-slate-50">
                     <img
                       src={photoPreview}
                       alt="Breakdown attachment"
@@ -1355,11 +1355,11 @@ export default function CustomerDashboard({
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-full py-4 px-4 rounded-xl border-2 border-dashed border-[#D5DEE5] hover:border-[#2F6B73] bg-[#F8FAFC] flex flex-col items-center justify-center gap-1 text-[#64748B] hover:text-[#2F6B73] transition-colors cursor-pointer"
+                    className="w-full py-4 px-4 rounded-xl border-2 border-dashed border-[rgba(107,74,46,0.25)] hover:border-[#6B4A2E] bg-white/60 flex flex-col items-center justify-center gap-1 text-[#766B60] hover:text-[#6B4A2E] transition-colors cursor-pointer"
                   >
                     <Upload size={20} />
                     <span className="text-xs font-bold">Tap to Take or Upload Breakdown Photo</span>
-                    <span className="text-[10px] text-slate-400">JPG, PNG under 8MB</span>
+                    <span className="text-[10px] text-[#766B60]">JPG, PNG under 8MB</span>
                   </button>
                 )}
               </div>
@@ -1434,39 +1434,39 @@ export default function CustomerDashboard({
                     return (
                       <div
                         key={shop.id}
-                        className="p-4 sm:p-5 rounded-2xl bg-white border border-[#D5DEE5] shadow-xs space-y-4"
+                        className="p-4 sm:p-5 rounded-2xl glass-card space-y-4"
                       >
                         {/* Header: Shop Name & Distance */}
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <div className="flex items-center gap-2">
-                              <h3 className="text-base font-extrabold text-[#172033]">{shop.shopName}</h3>
+                              <h3 className="text-base font-extrabold text-[#29231E]">{shop.shopName}</h3>
                               <span className="px-2 py-0.5 rounded-full bg-[#DCFCE7] text-[#166534] text-[10px] font-bold border border-[#86EFAC] flex items-center gap-0.5">
                                 <ShieldCheck size={11} /> Verified
                               </span>
                             </div>
-                            <p className="text-xs text-[#64748B] mt-0.5 flex items-center gap-1">
-                              <MapPin size={12} className="text-[#2F6B73] shrink-0" />
+                            <p className="text-xs text-[#766B60] mt-0.5 flex items-center gap-1">
+                              <MapPin size={12} className="text-[#6B4A2E] shrink-0" />
                               <span className="truncate">{shop.address}</span>
                             </p>
                           </div>
 
                           {/* Distance Badge */}
                           <div className="text-right shrink-0">
-                            <span className="text-sm font-black text-[#2F6B73] block">{shop.distanceKm} km</span>
-                            <span className="text-[10px] text-[#64748B] font-semibold">~{shop.etaMinutes} mins arrival</span>
+                            <span className="text-sm font-black text-[#6B4A2E] block">{shop.distanceKm} km</span>
+                            <span className="text-[10px] text-[#766B60] font-semibold">~{shop.etaMinutes} mins arrival</span>
                           </div>
                         </div>
 
                         {/* Spare Parts Sale Option */}
-                        <div className="p-3.5 rounded-xl bg-[#EAF4FF]/40 border border-[#BFDBFE]">
+                        <div className="p-3.5 rounded-xl bg-[rgba(107,74,46,0.08)] border border-[rgba(107,74,46,0.2)]">
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-[11px] font-extrabold text-[#172033] flex items-center gap-1.5">
-                              <ShoppingBag size={13} className="text-[#2F6B73]" />
+                            <span className="text-[11px] font-extrabold text-[#29231E] flex items-center gap-1.5">
+                              <ShoppingBag size={13} className="text-[#6B4A2E]" />
                               <span>Shop Spare Parts for Sale (உதிரி பாகங்கள்):</span>
                             </span>
                             {selectedSpareParts.length > 0 && (
-                              <span className="text-[10px] text-white font-bold bg-[#2F6B73] px-2 py-0.5 rounded-full">
+                              <span className="text-[10px] text-white font-bold bg-[#6B4A2E] px-2 py-0.5 rounded-full">
                                 {selectedSpareParts.length} selected
                               </span>
                             )}
@@ -1481,15 +1481,15 @@ export default function CustomerDashboard({
                                   onClick={() => toggleSparePart(sp.name)}
                                   className={`p-2 rounded-xl text-left border transition-all cursor-pointer flex flex-col justify-between ${
                                     isChosen
-                                      ? "bg-[#2F6B73] text-white border-[#2F6B73] shadow-xs"
-                                      : "bg-white text-[#172033] border-[#D5DEE5] hover:border-slate-300"
+                                      ? "bg-[#6B4A2E] text-white border-[#6B4A2E] shadow-xs"
+                                      : "bg-white/70 text-[#29231E] border-[rgba(107,74,46,0.2)] hover:border-[#6B4A2E]"
                                   }`}
                                 >
                                   <span className="text-[10px] font-bold leading-tight flex items-start gap-1">
                                     {isChosen && <CheckCircle2 size={11} className="shrink-0 mt-0.5" />}
                                     <span>{sp.name}</span>
                                   </span>
-                                  <span className={`text-[10px] font-extrabold mt-1 ${isChosen ? "text-blue-100" : "text-[#2F6B73]"}`}>
+                                  <span className={`text-[10px] font-extrabold mt-1 ${isChosen ? "text-[#F8F4EE]" : "text-[#6B4A2E]"}`}>
                                     ₹{sp.price}
                                   </span>
                                 </button>
@@ -1503,9 +1503,9 @@ export default function CustomerDashboard({
                           {/* 1. Direct Call */}
                           <a
                             href={`tel:${shop.phone}`}
-                            className="flex-1 h-10 px-3 rounded-xl bg-white hover:bg-slate-50 text-[#172033] border border-[#D5DEE5] text-xs font-bold flex items-center justify-center gap-1.5 transition-colors text-center cursor-pointer shadow-xs"
+                            className="flex-1 h-10 px-3 rounded-xl glass-btn-secondary text-xs font-bold flex items-center justify-center gap-1.5 transition-colors text-center cursor-pointer shadow-xs"
                           >
-                            <Phone size={14} className="text-[#2F6B73]" />
+                            <Phone size={14} className="text-[#6B4A2E]" />
                             <span>Call</span>
                           </a>
 
@@ -1513,7 +1513,7 @@ export default function CustomerDashboard({
                           <button
                             type="button"
                             onClick={() => triggerWhatsAppRescue(shop)}
-                            className="flex-1 h-10 px-3 rounded-xl bg-[#DCFCE7] hover:bg-emerald-100 text-[#166534] border border-[#86EFAC] text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer text-center shadow-xs"
+                            className="flex-1 h-10 px-3 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#166534] border border-[#25D366]/35 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer text-center shadow-xs"
                           >
                             <Send size={14} className="text-emerald-700" />
                             <span>WhatsApp</span>
@@ -1527,7 +1527,7 @@ export default function CustomerDashboard({
                             className={`min-[480px]:flex-[1.4] h-10 px-3.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs ${
                               isRequested
                                 ? "bg-emerald-600 text-white"
-                                : "bg-[#2F6B73] hover:bg-[#24545A] text-white"
+                                : "glass-btn-primary"
                             }`}
                           >
                             {isSubmittingThis ? (
@@ -1553,8 +1553,8 @@ export default function CustomerDashboard({
 
               {/* Initial State: Waiting for user to detect GPS location */}
               {!loadingShops && latitude === null && (
-                <div className="p-7 rounded-2xl bg-white border border-[#D5DEE5] text-center space-y-3.5 shadow-xs">
-                  <div className="w-12 h-12 rounded-xl bg-teal-50 text-[#2F6B73] flex items-center justify-center mx-auto border border-[#BFDBFE]">
+                <div className="p-7 rounded-2xl glass-card text-center space-y-3.5 shadow-xs">
+                  <div className="w-12 h-12 rounded-xl bg-[rgba(107,74,46,0.12)] text-[#6B4A2E] flex items-center justify-center mx-auto border border-[rgba(107,74,46,0.25)]">
                     <LocateFixed size={24} />
                   </div>
                   <div>

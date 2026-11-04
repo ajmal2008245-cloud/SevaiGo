@@ -23,7 +23,7 @@ export default function ShopCard({ shop, language, isSaved, onOpen, onFavorite, 
   const statusText = status === "closed" ? t(language, "currentlyClosed") : status === "busy" ? t(language, "busyNow") : t(language, "freeNow");
   return (
     <article
-      className="shop-card group relative p-3.5 rounded-2xl bg-white hover:bg-[#F8FAFC] border border-[#D5DEE5] hover:border-[#3B82F6]/60 shadow-xs transition-all duration-300 cursor-pointer flex flex-col justify-between"
+      className="shop-card group relative p-3.5 rounded-2xl glass-card hover:border-[#6B4A2E]/60 transition-all duration-300 cursor-pointer flex flex-col justify-between"
       onClick={() => onOpen(shop)}
       onKeyDown={(event) => { if (event.key === "Enter") onOpen(shop); }}
       tabIndex={0}
@@ -32,7 +32,7 @@ export default function ShopCard({ shop, language, isSaved, onOpen, onFavorite, 
     >
       <div className="flex gap-3.5">
         {/* Workshop Image */}
-        <div className="w-20 h-24 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-[#D5DEE5] relative">
+        <div className="w-20 h-24 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-[rgba(107,74,46,0.2)] relative">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
@@ -49,7 +49,7 @@ export default function ShopCard({ shop, language, isSaved, onOpen, onFavorite, 
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2 mb-1">
             <div className="min-w-0">
-              <h3 className="text-sm font-bold text-[#172033] group-hover:text-[#2F6B73] transition-colors truncate">
+              <h3 className="text-sm font-bold text-[#29231E] group-hover:text-[#6B4A2E] transition-colors truncate">
                 {shop.shopName}
               </h3>
               {shop.isRegisteredOwner && (
@@ -61,7 +61,7 @@ export default function ShopCard({ shop, language, isSaved, onOpen, onFavorite, 
 
             <button
               type="button"
-              className={`p-1.5 rounded-lg bg-[#F8FAFC] hover:bg-slate-100 border border-[#D5DEE5] transition-colors shrink-0 cursor-pointer ${isSaved ? "text-[#2F6B73]" : "text-[#94A3B8]"}`}
+              className={`p-1.5 rounded-lg bg-white/70 hover:bg-white border border-[rgba(107,74,46,0.22)] transition-colors shrink-0 cursor-pointer ${isSaved ? "text-[#6B4A2E]" : "text-[#94A3B8]"}`}
               onClick={(event) => { event.stopPropagation(); onFavorite(shop); }}
               aria-label={isSaved ? "Remove from saved shops" : "Save workshop"}
             >
@@ -69,17 +69,17 @@ export default function ShopCard({ shop, language, isSaved, onOpen, onFavorite, 
             </button>
           </div>
 
-          <p className="text-xs text-[#64748B] flex items-center gap-1 truncate mb-2">
-            <MapPin size={12} className="text-[#2F6B73] shrink-0" />
+          <p className="text-xs text-[#766B60] flex items-center gap-1 truncate mb-2">
+            <MapPin size={12} className="text-[#6B4A2E] shrink-0" />
             <span className="truncate">{shop.address}</span>
           </p>
 
-          <div className="flex items-center gap-2 text-xs text-[#64748B]">
+          <div className="flex items-center gap-2 text-xs text-[#766B60]">
             <span className="font-bold text-[#D97706] flex items-center gap-0.5">
               <Star size={12} fill="currentColor" /> {shop.rating.toFixed(1)}
             </span>
             <span>({shop.reviewCount})</span>
-            <span className="text-[#D5DEE5]">•</span>
+            <span className="text-[rgba(107,74,46,0.25)]">•</span>
             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
               status === "free" ? "bg-[#DCFCE7] text-[#166534] border border-[#86EFAC]" : status === "busy" ? "bg-amber-50 text-amber-700 border border-amber-200" : "bg-[#FEE2E2] text-[#991B1B] border border-[#FCA5A5]"
             }`}>
@@ -89,7 +89,7 @@ export default function ShopCard({ shop, language, isSaved, onOpen, onFavorite, 
 
           <div className="flex items-center gap-1.5 mt-2 flex-wrap">
             {shop.specializations.slice(0, 2).map((specialty) => (
-              <span key={specialty} className="text-[10px] font-medium text-[#475569] bg-[#F8FAFC] border border-[#D5DEE5] px-2 py-0.5 rounded-lg">
+              <span key={specialty} className="text-[10px] font-medium text-[#49301F] bg-[rgba(107,74,46,0.08)] border border-[rgba(107,74,46,0.18)] px-2 py-0.5 rounded-lg">
                 {specialty}
               </span>
             ))}
@@ -98,14 +98,14 @@ export default function ShopCard({ shop, language, isSaved, onOpen, onFavorite, 
       </div>
 
       {/* Card Footer Actions */}
-      <div className="flex items-center justify-between pt-3 border-t border-[#D5DEE5] mt-3">
-        <span className="text-xs text-[#64748B]">
-          Est. Charge: <strong className="text-[#172033]">₹{shop.priceMin} - ₹{shop.priceMax}</strong>
+      <div className="flex items-center justify-between pt-3 border-t border-[rgba(107,74,46,0.18)] mt-3">
+        <span className="text-xs text-[#766B60]">
+          Est. Charge: <strong className="text-[#29231E]">₹{shop.priceMin} - ₹{shop.priceMax}</strong>
         </span>
 
         <div className="flex items-center gap-2">
           <a
-            className="w-8 h-8 rounded-lg bg-[#F8FAFC] hover:bg-[#2F6B73] hover:text-white text-[#475569] border border-[#D5DEE5] flex items-center justify-center transition-colors"
+            className="w-8 h-8 rounded-lg bg-white/70 hover:bg-[#6B4A2E] hover:text-white text-[#766B60] border border-[rgba(107,74,46,0.22)] flex items-center justify-center transition-colors"
             href={getTelUri(shop.phone) || "#"}
             aria-label={`Call ${shop.shopName}`}
             onClick={(event) => {
@@ -119,7 +119,7 @@ export default function ShopCard({ shop, language, isSaved, onOpen, onFavorite, 
 
           <button
             type="button"
-            className="px-3 py-1.5 rounded-lg bg-[#2F6B73] hover:bg-[#24545A] text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+            className="px-3 py-1.5 rounded-lg glass-btn-primary text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer"
             onClick={(event) => { event.stopPropagation(); onOpen(shop); }}
           >
             <span>Details</span>

@@ -35,8 +35,8 @@ export async function GET() {
               specializations: matched.services || [],
               openTime: "08:00",
               closeTime: "21:00",
-              isVerified: matched.verified ?? true,
-              approvalStatus: "approved",
+              isVerified: Boolean(matched.verified),
+              approvalStatus: matched.verified ? "approved" : "pending",
               availabilityStatus: "available",
             };
           }
